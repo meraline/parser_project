@@ -1,41 +1,12 @@
-from dataclasses import dataclass
-from datetime import datetime
-from typing import Optional
-import hashlib
+"""Model definitions used by the parsers."""
+
+# The project keeps the dataclass definition in ``auto_reviews_parser`` to
+# simplify access for the unit tests.  Re-export it here so that parser
+# modules can continue importing :class:`ReviewData` from
+# ``parsers.models``.
+
+from auto_reviews_parser import ReviewData
 
 
-@dataclass
-class ReviewData:
-    """Structure describing a parsed review."""
+__all__ = ["ReviewData"]
 
-    source: str
-    type: str
-    brand: str
-    model: str
-    generation: Optional[str] = None
-    year: Optional[int] = None
-    url: str = ""
-    title: str = ""
-    content: str = ""
-    author: str = ""
-    rating: Optional[float] = None
-    pros: str = ""
-    cons: str = ""
-    mileage: Optional[int] = None
-    engine_volume: Optional[float] = None
-    fuel_type: str = ""
-    transmission: str = ""
-    body_type: str = ""
-    drive_type: str = ""
-    publish_date: Optional[datetime] = None
-    views_count: Optional[int] = None
-    likes_count: Optional[int] = None
-    comments_count: Optional[int] = None
-    parsed_at: datetime = None
-    content_hash: str = ""
-
-    def __post_init__(self) -> None:
-        if self.parsed_at is None:
-            self.parsed_at = datetime.now()
-        content_for_hash = f"{self.url}_{self.title}_{self.content[:100] if self.content else ''}"
-        self.content_hash = hashlib.md5(content_for_hash.encode()).hexdigest()

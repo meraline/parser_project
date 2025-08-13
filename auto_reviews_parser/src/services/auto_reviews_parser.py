@@ -1,56 +1,26 @@
-"""Стабильный парсер отзывов и бортжурналов для автомобилей
+#!/usr/bin/env python3
+"""
+Стабильный парсер отзывов и бортжурналов для автомобилей
 Собирает данные с Drom.ru и Drive2.ru в базу данных
 Работает в щадящем режиме для долгосрочного сбора данных
 """
 
+import sqlite3
 import time
 import random
-import asyncio
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 import re
 import json
+import logging
 from urllib.parse import urljoin, urlparse
 import hashlib
 from pathlib import Path
-<<<<<<< HEAD
-import os
-
-from dotenv import load_dotenv
-from prometheus_client import Counter, start_http_server, REGISTRY
-
-try:
-    import redis
-except ImportError:  # pragma: no cover - redis is optional
-    redis = None
-
-from src.utils.logger import get_logger
-from src.utils.validators import validate_non_empty_string
-=======
-from dataclasses import dataclass
-from src.utils.delay_manager import DelayManager
-from src.utils.retry_decorator import retry_async
->>>>>>> origin/codex/implement-delay-manager-and-retry-decorator
 
 from botasaurus.browser import browser, Driver
 from botasaurus.request import request, Request
 from botasaurus.soupify import soupify
 from botasaurus import bt
-
-<<<<<<< HEAD:auto_reviews_parser.py
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-logger = get_logger(__name__)
-=======
-from src.database.base import Database
-from src.database.repositories.review_repository import ReviewRepository
-from src.database.repositories.queue_repository import QueueRepository
->>>>>>> origin/codex/create-database-abstraction-and-repositories
-=======
-# Load environment variables
-load_dotenv()
->>>>>>> origin/codex/create-docker-folder-with-configuration-files
 
 # ==================== НАСТРОЙКИ ====================
 
@@ -59,7 +29,7 @@ class Config:
     """Конфигурация парсера"""
 
     # База данных
-    DB_PATH = os.getenv("DB_PATH", "auto_reviews.db")
+    DB_PATH = "auto_reviews.db"
 
     # Задержки (в секундах)
     MIN_DELAY = 5  # Минимальная задержка между запросами
@@ -99,84 +69,11 @@ class Config:
         "audi": ["a3", "a4", "a6", "q3", "q5", "q7"],
         "lada": ["granta", "kalina", "priora", "vesta", "xray", "largus"],
     }
-=======
-from src.config.settings import TARGET_BRANDS, settings
-
-# ==================== SETTINGS ====================
->>>>>>> origin/codex/create-settings.py-and-targets.yaml
-
-
-# ==================== METRICS ====================
-
-PROMETHEUS_PORT = int(os.getenv("PROMETHEUS_PORT", 8000))
-
-
-def _get_counter(name: str, description: str) -> Counter:
-    try:
-        return Counter(name, description)
-    except ValueError:  # counter already exists (e.g. in tests)
-        return REGISTRY._names_to_collectors[name]
-
-
-SOURCE_COUNTER = _get_counter("sources_processed_total", "Sources processed")
-REVIEW_COUNTER = _get_counter("reviews_saved_total", "Reviews saved")
-ERROR_COUNTER = _get_counter("parser_errors_total", "Errors during parsing")
 
 
 # ==================== МОДЕЛИ ДАННЫХ ====================
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 from dataclasses import dataclass
-<<<<<<< HEAD
-from typing import Optional
-=======
-from datetime import datetime
-from typing import Optional
-import hashlib
-=======
-from src.models.review import Review
->>>>>>> origin/codex/create-review-model-and-update-parsers
-=======
-
-@dataclass
-class ReviewData:
-    """Структура данных отзыва"""
-
-    source: str  # drom.ru, drive2.ru
-    type: str  # review, board_journal
-    brand: str
-    model: str
-    generation: Optional[str] = None
-    year: Optional[int] = None
-    url: str = ""
-    title: str = ""
-    content: str = ""
-    author: str = ""
-    rating: Optional[float] = None
-    pros: str = ""
-    cons: str = ""
-    mileage: Optional[int] = None
-    engine_volume: Optional[float] = None
-    fuel_type: str = ""
-    transmission: str = ""
-    body_type: str = ""
-    drive_type: str = ""
-    publish_date: Optional[datetime] = None
-    views_count: Optional[int] = None
-    likes_count: Optional[int] = None
-    comments_count: Optional[int] = None
-    parsed_at: datetime = None
-    content_hash: str = ""
-
-    def __post_init__(self):
-        if self.parsed_at is None:
-            self.parsed_at = datetime.now()
-        content_for_hash = (
-            f"{self.url}_{self.title}_{self.content[:100] if self.content else ''}"
-        )
-        self.content_hash = hashlib.md5(content_for_hash.encode()).hexdigest()
->>>>>>> origin/codex/implement-delay-manager-and-retry-decorator
 
 
 @dataclass
@@ -217,56 +114,13 @@ class ReviewData:
         )
         self.content_hash = hashlib.md5(content_for_hash.encode()).hexdigest()
 
-from src.services.queue_service import QueueService
->>>>>>> origin/codex/create-parser_service-and-new-services
-
-
-@dataclass
-class ReviewData:
-    """Структура данных отзыва"""
-
-    source: str  # drom.ru, drive2.ru
-    type: str  # review, board_journal
-    brand: str
-    model: str
-    generation: Optional[str] = None
-    year: Optional[int] = None
-    url: str = ""
-    title: str = ""
-    content: str = ""
-    author: str = ""
-    rating: Optional[float] = None
-    pros: str = ""
-    cons: str = ""
-    mileage: Optional[int] = None
-    engine_volume: Optional[float] = None
-    fuel_type: str = ""
-    transmission: str = ""
-    body_type: str = ""
-    drive_type: str = ""
-    publish_date: Optional[datetime] = None
-    views_count: Optional[int] = None
-    likes_count: Optional[int] = None
-    comments_count: Optional[int] = None
-    parsed_at: datetime = None
-    content_hash: str = ""
-
-    def __post_init__(self):
-        if self.parsed_at is None:
-            self.parsed_at = datetime.now()
-        content_for_hash = (
-            f"{self.url}_{self.title}_{self.content[:100] if self.content else ''}"
-        )
-        self.content_hash = hashlib.md5(content_for_hash.encode()).hexdigest()
-
-<<<<<<< HEAD
 # ==================== БАЗА ДАННЫХ ====================
 
 
 class ReviewsDatabase:
     """Управление базой данных отзывов"""
 
-    def __init__(self, db_path: str = settings.db_path):
+    def __init__(self, db_path: str = Config.DB_PATH):
         self.db_path = db_path
         self.init_database()
 
@@ -363,7 +217,7 @@ class ReviewsDatabase:
         conn.commit()
         conn.close()
 
-    def save_review(self, review: Review) -> bool:
+    def save_review(self, review: ReviewData) -> bool:
         """Сохранение отзыва в базу"""
         try:
             conn = sqlite3.connect(self.db_path)
@@ -416,7 +270,7 @@ class ReviewsDatabase:
             # Дублирующая запись
             return False
         except Exception as e:
-            logger.error(f"Ошибка сохранения отзыва: {e}")
+            logging.error(f"Ошибка сохранения отзыва: {e}")
             return False
 
     def get_reviews_count(self, brand: str = None, model: str = None) -> int:
@@ -480,20 +334,12 @@ class ReviewsDatabase:
             "by_type": by_type,
         }
 
-=======
->>>>>>> origin/codex/create-database-abstraction-and-repositories
 
 # ==================== ПАРСЕРЫ ====================
 
 
 from parsers import DromParser, Drive2Parser
 
-=======
-from src.config.settings import Config
-from src.database.reviews_database import ReviewsDatabase
-from src.parsers import DromParser, Drive2Parser
-from src.models import ReviewData
->>>>>>> origin/codex/restructure-project-directory-and-update-imports:auto_reviews_parser/src/services/auto_reviews_parser.py
 
 # ==================== ГЛАВНЫЙ ПАРСЕР ====================
 
@@ -501,49 +347,28 @@ from src.models import ReviewData
 class AutoReviewsParser:
     """Главный класс парсера отзывов автомобилей"""
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-    def __init__(self, db_path: str = Config.DB_PATH):
-<<<<<<< HEAD
-        validate_non_empty_string(db_path, "db_path")
-=======
-    def __init__(self, db_path: str = settings.db_path):
->>>>>>> origin/codex/create-settings.py-and-targets.yaml
-        self.db = ReviewsDatabase(db_path)
-=======
-        self.db = Database(db_path)
-        self.review_repo = ReviewRepository(self.db)
-        self.queue_repo = QueueRepository(self.db)
-=======
-    def __init__(self, db_path: str = Config.DB_PATH, queue_service: Optional[QueueService] = None):
-        self.db = ReviewsDatabase(db_path)
-        self.queue_service = queue_service or QueueService(self.db.db_path, Config.TARGET_BRANDS)
->>>>>>> origin/codex/create-parser_service-and-new-services
+    def __init__(
+        self,
+        db: Optional[ReviewsDatabase] = None,
+        drom_parser: Optional[DromParser] = None,
+        drive2_parser: Optional[Drive2Parser] = None,
+        db_path: str = Config.DB_PATH,
+    ):
+        """Создает экземпляр основного парсера.
+
+        Параметры передаются опционально, что позволяет
+        использовать dependency-injector для управления
+        зависимостями при необходимости. При прямом создании
+        экземпляра поведение остаётся прежним.
+        """
+
+        self.db = db or ReviewsDatabase(db_path)
         self.setup_logging()
->>>>>>> origin/codex/create-database-abstraction-and-repositories
         self.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-<<<<<<< HEAD
-        # Optional Redis cache
-        self.redis = None
-        if redis and os.getenv("REDIS_URL"):
-            try:
-                self.redis = redis.from_url(os.getenv("REDIS_URL"))
-            except Exception:
-                self.redis = None
-
         # Инициализация парсеров
-        self.drom_parser = DromParser(self.review_repo)
-        self.drive2_parser = Drive2Parser(self.review_repo)
-=======
-        # Менеджер задержек используется всеми парсерами и сервисами
-        self.delay_manager = DelayManager(
-            Config.MIN_DELAY, Config.MAX_DELAY, Config.ERROR_DELAY
-        )
-
-        # Инициализация парсеров
-        self.drom_parser = DromParser(self.db, self.delay_manager)
-        self.drive2_parser = Drive2Parser(self.db, self.delay_manager)
+        self.drom_parser = drom_parser or DromParser(self.db)
+        self.drive2_parser = drive2_parser or Drive2Parser(self.db)
 
     def setup_logging(self):
         """Настройка логирования"""
@@ -560,14 +385,9 @@ class AutoReviewsParser:
                 logging.StreamHandler(),
             ],
         )
->>>>>>> origin/codex/implement-delay-manager-and-retry-decorator
 
-<<<<<<< HEAD
     def initialize_sources_queue(self):
         """Инициализация очереди источников для парсинга"""
-<<<<<<< HEAD
-        self.queue_repo.initialize(Config.TARGET_BRANDS)
-=======
         conn = sqlite3.connect(self.db.db_path)
         cursor = conn.cursor()
 
@@ -575,7 +395,7 @@ class AutoReviewsParser:
         cursor.execute("DELETE FROM sources_queue")
 
         # Добавляем все комбинации брендов и моделей
-        for brand, models in TARGET_BRANDS.items():
+        for brand, models in Config.TARGET_BRANDS.items():
             for model in models:
                 for source in ["drom.ru", "drive2.ru"]:
                     cursor.execute(
@@ -589,60 +409,74 @@ class AutoReviewsParser:
         conn.commit()
         conn.close()
 
->>>>>>> origin/codex/create-settings.py-and-targets.yaml
         total_sources = (
-            len(TARGET_BRANDS)
-            * sum(len(models) for models in TARGET_BRANDS.values())
+            len(Config.TARGET_BRANDS)
+            * sum(len(models) for models in Config.TARGET_BRANDS.values())
             * 2
         )
         print(f"✅ Инициализирована очередь из {total_sources} источников")
 
     def get_next_source(self) -> Optional[Tuple[str, str, str]]:
         """Получение следующего источника для парсинга"""
-        return self.queue_repo.get_next()
+        conn = sqlite3.connect(self.db.db_path)
+        cursor = conn.cursor()
+
+        # Ищем неспарсенные источники, сортируем по приоритету
+        cursor.execute(
+            """
+            SELECT id, brand, model, source FROM sources_queue 
+            WHERE status = 'pending' 
+            ORDER BY priority DESC, RANDOM()
+            LIMIT 1
+        """
+        )
+
+        result = cursor.fetchone()
+
+        if result:
+            source_id, brand, model, source = result
+
+            # Отмечаем как обрабатываемый
+            cursor.execute(
+                """
+                UPDATE sources_queue 
+                SET status = 'processing', last_parsed = CURRENT_TIMESTAMP 
+                WHERE id = ?
+            """,
+                (source_id,),
+            )
+
+            conn.commit()
+            conn.close()
+
+            return brand, model, source
+
+        conn.close()
+        return None
 
     def mark_source_completed(
         self, brand: str, model: str, source: str, pages_parsed: int, reviews_found: int
     ):
         """Отметка источника как завершенного"""
-        self.queue_repo.mark_completed(
-            brand, model, source, pages_parsed, reviews_found
-        )
-=======
->>>>>>> origin/codex/create-parser_service-and-new-services
+        conn = sqlite3.connect(self.db.db_path)
+        cursor = conn.cursor()
 
-    def parse_single_source(self, brand: str, model: str, source: str):
+        cursor.execute(
+            """
+            UPDATE sources_queue 
+            SET status = 'completed', parsed_pages = ?, total_pages = ?
+            WHERE brand = ? AND model = ? AND source = ?
+        """,
+            (pages_parsed, pages_parsed, brand, model, source),
+        )
+
+        conn.commit()
+        conn.close()
+
+    def parse_single_source(self, brand: str, model: str, source: str) -> int:
         """Парсинг одного источника"""
-        brand = validate_non_empty_string(brand, "brand")
-        model = validate_non_empty_string(model, "model")
         print(f"\n🎯 Парсинг: {brand} {model} на {source}")
 
-<<<<<<< HEAD
-        reviews = []
-        data = {"brand": brand, "model": model, "max_pages": settings.pages_per_session}
-
-        try:
-            if source == "drom.ru":
-<<<<<<< HEAD
-<<<<<<< HEAD
-                reviews = self.drom_parser.parse_brand_model_reviews(data)
-=======
-                try:
-                    reviews = self.drom_parser.parse_brand_model_reviews(
-                        data, metadata=self.drom_parser
-                    )
-                except TypeError:
-                    reviews = self.drom_parser.parse_brand_model_reviews(data)
->>>>>>> origin/codex/create-parser_service-and-new-services
-            elif source == "drive2.ru":
-                reviews = self.drive2_parser.parse_brand_model_reviews(data)
-            if reviews is None:
-                logger.warning(
-=======
-                reviews = self.drom_parser.parse_brand_model_reviews(data)
-            elif source == "drive2.ru":
-                reviews = self.drive2_parser.parse_brand_model_reviews(data)
-=======
         data = {"brand": brand, "model": model, "max_pages": Config.PAGES_PER_SESSION}
 
         try:
@@ -651,102 +485,33 @@ class AutoReviewsParser:
             elif source == "drive2.ru":
                 reviews = self.drive2_parser.parse_brand_model_reviews(data)
             else:
-                reviews = []
->>>>>>> origin/codex/implement-delay-manager-and-retry-decorator
+                logging.warning(f"Unknown source: {source}")
+                return False
 
             if not reviews:
                 logging.warning(
->>>>>>> origin/codex/create-review-model-and-update-parsers
                     f"Parser returned no reviews for {brand} {model} on {source}"
                 )
-<<<<<<< HEAD
-                return False
-=======
                 return []
 
-            dm = getattr(
-                self,
-                "delay_manager",
-                DelayManager(Config.MIN_DELAY, Config.MAX_DELAY, Config.ERROR_DELAY),
-            )
-
-            @retry_async(retries=Config.MAX_RETRIES, delay_manager=dm)
-            async def save(review):
-                return self.db.save_review(review)
->>>>>>> origin/codex/implement-delay-manager-and-retry-decorator
-
+            # Сохраняем отзывы в базу
             saved_count = 0
-            redis_client = getattr(self, "redis", None)
             for review in reviews:
-<<<<<<< HEAD
-<<<<<<< HEAD
-                if self.review_repo.save(review):
-=======
-                if redis_client and redis_client.sismember("processed_reviews", review.url):
-                    continue
                 if self.db.save_review(review):
->>>>>>> origin/codex/create-docker-folder-with-configuration-files
-=======
-                if asyncio.run(save(review)):
->>>>>>> origin/codex/implement-delay-manager-and-retry-decorator
                     saved_count += 1
-                    REVIEW_COUNTER.inc()
-                    if redis_client:
-                        redis_client.sadd("processed_reviews", review.url)
 
-            SOURCE_COUNTER.inc()
             print(f"  💾 Сохранено {saved_count} из {len(reviews)} отзывов")
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-            # Отмечаем источник как завершенный только если есть сохраненные отзывы
-            if saved_count:
-                if hasattr(self, "queue_service") and self.queue_service:
-                    self.queue_service.mark_source_completed(
-                        brand, model, source, Config.PAGES_PER_SESSION, saved_count
-                    )
-                elif hasattr(self, "mark_source_completed"):
-                    self.mark_source_completed(
-                        brand, model, source, Config.PAGES_PER_SESSION, saved_count
-                    )
-=======
             # Отмечаем источник как завершенный
-=======
->>>>>>> origin/codex/implement-delay-manager-and-retry-decorator
             self.mark_source_completed(
-                brand, model, source, settings.pages_per_session, saved_count
+                brand, model, source, Config.PAGES_PER_SESSION, saved_count
             )
->>>>>>> origin/codex/create-settings.py-and-targets.yaml
 
-<<<<<<< HEAD
-            return saved_count or False
-=======
-            return saved_count if saved_count > 0 else False
->>>>>>> origin/codex/create-review-model-and-update-parsers
+            return saved_count
 
         except Exception as e:
-<<<<<<< HEAD
-<<<<<<< HEAD
-            logger.error(f"Критическая ошибка парсинга {brand} {model} {source}: {e}")
-=======
-            ERROR_COUNTER.inc()
             logging.error(f"Критическая ошибка парсинга {brand} {model} {source}: {e}")
-<<<<<<< HEAD
-<<<<<<< HEAD
->>>>>>> origin/codex/create-docker-folder-with-configuration-files
-            return 0
-=======
             return False
->>>>>>> origin/codex/create-parser_service-and-new-services
-=======
-            return False
->>>>>>> origin/codex/create-review-model-and-update-parsers
-=======
-            logging.error(
-                f"Критическая ошибка парсинга {brand} {model} {source}: {e}"
-            )
-            return []
->>>>>>> origin/codex/implement-delay-manager-and-retry-decorator
 
     def run_parsing_session(
         self, max_sources: int = 10, session_duration_hours: int = 2
@@ -766,7 +531,7 @@ class AutoReviewsParser:
 
         while sources_processed < max_sources and datetime.now() < session_end:
             # Получаем следующий источник
-            source_info = self.queue_service.get_next_source()
+            source_info = self.get_next_source()
 
             if not source_info:
                 print("\n✅ Все источники обработаны!")
@@ -775,17 +540,12 @@ class AutoReviewsParser:
             brand, model, source = source_info
 
             # Проверяем лимит отзывов для модели
-<<<<<<< HEAD
-            current_count = self.review_repo.get_reviews_count(brand, model)
-            if current_count >= Config.MAX_REVIEWS_PER_MODEL:
-=======
             current_count = self.db.get_reviews_count(brand, model)
-            if current_count >= settings.max_reviews_per_model:
->>>>>>> origin/codex/create-settings.py-and-targets.yaml
+            if current_count >= Config.MAX_REVIEWS_PER_MODEL:
                 print(
                     f"  ⚠️ Лимит отзывов для {brand} {model} достигнут ({current_count})"
                 )
-                self.queue_service.mark_source_completed(brand, model, source, 0, 0)
+                self.mark_source_completed(brand, model, source, 0, 0)
                 continue
 
             # Парсим источник
@@ -796,23 +556,18 @@ class AutoReviewsParser:
 
                 # Пауза между источниками
                 if sources_processed < max_sources:
-                    inter_delay = DelayManager(30, 60, self.delay_manager.error_delay)
-                    delay = inter_delay._random_delay()
+                    delay = random.uniform(30, 60)  # 30-60 секунд между источниками
                     print(f"  ⏳ Пауза {delay:.1f} сек...")
                     time.sleep(delay)
 
             except Exception as e:
-                logger.error(
+                logging.error(
                     f"Ошибка обработки источника {brand} {model} {source}: {e}"
                 )
                 sources_processed += 1
 
                 # Увеличенная пауза при ошибке
-<<<<<<< HEAD
-                time.sleep(settings.error_delay)
-=======
-                self.delay_manager.sleep_error()
->>>>>>> origin/codex/implement-delay-manager-and-retry-decorator
+                time.sleep(Config.ERROR_DELAY)
 
         # Статистика сессии
         session_duration = datetime.now() - session_start
@@ -825,7 +580,7 @@ class AutoReviewsParser:
         print(f"{'='*60}")
 
         # Общая статистика базы
-        stats = self.review_repo.get_parsing_stats()
+        stats = self.db.get_parsing_stats()
         print(f"\n📈 ОБЩАЯ СТАТИСТИКА БАЗЫ ДАННЫХ")
         print(f"{'='*60}")
         print(f"Всего отзывов: {stats['total_reviews']}")
@@ -868,25 +623,35 @@ class AutoReviewsParser:
                 print("\n👋 Парсинг остановлен пользователем")
                 break
             except Exception as e:
-                logger.error(f"Критическая ошибка в непрерывном парсинге: {e}")
+                logging.error(f"Критическая ошибка в непрерывном парсинге: {e}")
                 print(f"❌ Критическая ошибка: {e}")
                 print("⏳ Пауза 30 минут перед повтором...")
-                DelayManager(0, 0, 1800).sleep_error()
+                time.sleep(1800)  # 30 минут пауза при критической ошибке
 
 
 # ==================== УТИЛИТЫ УПРАВЛЕНИЯ ====================
 
 
-<<<<<<< HEAD
 class ParserManager:
     """Менеджер для управления парсером"""
 
-    def __init__(self, db_path: str = settings.db_path):
-        self.parser = AutoReviewsParser(db_path)
+    def __init__(
+        self,
+        parser: Optional[AutoReviewsParser] = None,
+        db_path: str = Config.DB_PATH,
+    ):
+        """Создает менеджер парсера.
+
+        Параметр ``parser`` передается опционально, что позволяет
+        использовать внешний контейнер зависимостей. При отсутствии
+        значения создается собственный экземпляр ``AutoReviewsParser``.
+        """
+
+        self.parser = parser or AutoReviewsParser(db_path=db_path)
 
     def show_status(self):
         """Показать статус базы данных и очереди"""
-        stats = self.parser.review_repo.get_parsing_stats()
+        stats = self.parser.db.get_parsing_stats()
 
         print(f"\n📊 СТАТУС БАЗЫ ДАННЫХ")
         print(f"{'='*50}")
@@ -905,7 +670,13 @@ class ParserManager:
                 print(f"  {type_name}: {count:,}")
 
         # Статистика очереди
-        queue_stats = self.parser.queue_repo.get_stats()
+        conn = sqlite3.connect(self.parser.db.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT status, COUNT(*) FROM sources_queue GROUP BY status")
+        queue_stats = dict(cursor.fetchall())
+
+        conn.close()
 
         print(f"\n📋 СТАТУС ОЧЕРЕДИ")
         print(f"{'='*50}")
@@ -926,23 +697,29 @@ class ParserManager:
         """Экспорт данных из базы"""
         print(f"📤 Экспорт данных в формате {output_format}...")
 
+        conn = sqlite3.connect(self.parser.db.db_path)
+
+        # Получаем все отзывы
         query = """
-            SELECT
+            SELECT 
                 source, type, brand, model, year, title, author, rating,
                 content, pros, cons, mileage, engine_volume, fuel_type,
-                transmission, body_type, drive_type, publish_date,
+                transmission, body_type, drive_type, publish_date, 
                 views_count, likes_count, comments_count, url, parsed_at
             FROM reviews
             ORDER BY brand, model, parsed_at DESC
         """
 
         df_data = []
-        with self.parser.db.connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(query)
-            columns = [description[0] for description in cursor.description]
-            for row in cursor.fetchall():
-                df_data.append(dict(zip(columns, row)))
+        cursor = conn.cursor()
+        cursor.execute(query)
+
+        columns = [description[0] for description in cursor.description]
+
+        for row in cursor.fetchall():
+            df_data.append(dict(zip(columns, row)))
+
+        conn.close()
 
         if not df_data:
             print("❌ Нет данных для экспорта")
@@ -964,17 +741,12 @@ class ParserManager:
             print(f"❌ Неподдерживаемый формат: {output_format}")
 
 
-=======
->>>>>>> origin/codex/create-parser_service-and-new-services
 # ==================== ГЛАВНАЯ ФУНКЦИЯ ====================
 
 
 def main():
     """Главная функция для запуска парсера"""
     import argparse
-
-    # Запускаем HTTP-сервер метрик
-    start_http_server(PROMETHEUS_PORT)
 
     parser = argparse.ArgumentParser(description="Парсер отзывов автомобилей")
     parser.add_argument(
@@ -1003,30 +775,28 @@ def main():
 
     args = parser.parse_args()
 
-    from src.services.parser_service import ParserService
-
-    service = ParserService()
+    manager = ParserManager()
 
     if args.command == "init":
         print("🚀 Инициализация парсера...")
-        service.reset_queue()
+        manager.reset_queue()
         print("✅ Парсер готов к работе!")
 
     elif args.command == "parse":
         print("🎯 Запуск разовой сессии парсинга...")
-        service.parser.run_parsing_session(max_sources=args.sources)
+        manager.parser.run_parsing_session(max_sources=args.sources)
 
     elif args.command == "continuous":
         print("🔄 Запуск непрерывного парсинга...")
-        service.parser.run_continuous_parsing(
+        manager.parser.run_continuous_parsing(
             daily_sessions=args.sessions, session_sources=args.sources
         )
 
     elif args.command == "status":
-        service.show_status()
+        manager.show_status()
 
     elif args.command == "export":
-        service.export_data(output_format=args.format)
+        manager.export_data(output_format=args.format)
 
 
 if __name__ == "__main__":
