@@ -114,7 +114,54 @@ ERROR_COUNTER = _get_counter("parser_errors_total", "Errors during parsing")
 # ==================== МОДЕЛИ ДАННЫХ ====================
 
 from dataclasses import dataclass
+<<<<<<< HEAD
 from typing import Optional
+=======
+from datetime import datetime
+from typing import Optional
+import hashlib
+
+
+@dataclass
+class ReviewData:
+    """Структура данных отзыва"""
+
+    source: str  # drom.ru, drive2.ru
+    type: str  # review, board_journal
+    brand: str
+    model: str
+    generation: Optional[str] = None
+    year: Optional[int] = None
+    url: str = ""
+    title: str = ""
+    content: str = ""
+    author: str = ""
+    rating: Optional[float] = None
+    pros: str = ""
+    cons: str = ""
+    mileage: Optional[int] = None
+    engine_volume: Optional[float] = None
+    fuel_type: str = ""
+    transmission: str = ""
+    body_type: str = ""
+    drive_type: str = ""
+    publish_date: Optional[datetime] = None
+    views_count: Optional[int] = None
+    likes_count: Optional[int] = None
+    comments_count: Optional[int] = None
+    parsed_at: datetime = None
+    content_hash: str = ""
+
+    def __post_init__(self):
+        if self.parsed_at is None:
+            self.parsed_at = datetime.now()
+        content_for_hash = (
+            f"{self.url}_{self.title}_{self.content[:100] if self.content else ''}"
+        )
+        self.content_hash = hashlib.md5(content_for_hash.encode()).hexdigest()
+
+from src.services.queue_service import QueueService
+>>>>>>> origin/codex/create-parser_service-and-new-services
 
 
 @dataclass
@@ -391,6 +438,7 @@ from parsers import DromParser, Drive2Parser
 class AutoReviewsParser:
     """Главный класс парсера отзывов автомобилей"""
 
+<<<<<<< HEAD
     def __init__(self, db_path: str = Config.DB_PATH):
 <<<<<<< HEAD
         validate_non_empty_string(db_path, "db_path")
@@ -399,6 +447,11 @@ class AutoReviewsParser:
         self.db = Database(db_path)
         self.review_repo = ReviewRepository(self.db)
         self.queue_repo = QueueRepository(self.db)
+=======
+    def __init__(self, db_path: str = Config.DB_PATH, queue_service: Optional[QueueService] = None):
+        self.db = ReviewsDatabase(db_path)
+        self.queue_service = queue_service or QueueService(self.db.db_path, Config.TARGET_BRANDS)
+>>>>>>> origin/codex/create-parser_service-and-new-services
         self.setup_logging()
 >>>>>>> origin/codex/create-database-abstraction-and-repositories
         self.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -415,6 +468,7 @@ class AutoReviewsParser:
         self.drom_parser = DromParser(self.review_repo)
         self.drive2_parser = Drive2Parser(self.review_repo)
 
+<<<<<<< HEAD
     def initialize_sources_queue(self):
         """Инициализация очереди источников для парсинга"""
         self.queue_repo.initialize(Config.TARGET_BRANDS)
@@ -436,6 +490,8 @@ class AutoReviewsParser:
         self.queue_repo.mark_completed(
             brand, model, source, pages_parsed, reviews_found
         )
+=======
+>>>>>>> origin/codex/create-parser_service-and-new-services
 
     def parse_single_source(self, brand: str, model: str, source: str) -> int:
         """Парсинг одного источника"""
@@ -448,7 +504,16 @@ class AutoReviewsParser:
 
         try:
             if source == "drom.ru":
+<<<<<<< HEAD
                 reviews = self.drom_parser.parse_brand_model_reviews(data)
+=======
+                try:
+                    reviews = self.drom_parser.parse_brand_model_reviews(
+                        data, metadata=self.drom_parser
+                    )
+                except TypeError:
+                    reviews = self.drom_parser.parse_brand_model_reviews(data)
+>>>>>>> origin/codex/create-parser_service-and-new-services
             elif source == "drive2.ru":
                 reviews = self.drive2_parser.parse_brand_model_reviews(data)
             if reviews is None:
@@ -476,12 +541,18 @@ class AutoReviewsParser:
             SOURCE_COUNTER.inc()
             print(f"  💾 Сохранено {saved_count} из {len(reviews)} отзывов")
 
-            # Отмечаем источник как завершенный
-            self.mark_source_completed(
-                brand, model, source, Config.PAGES_PER_SESSION, saved_count
-            )
+            # Отмечаем источник как завершенный только если есть сохраненные отзывы
+            if saved_count:
+                if hasattr(self, "queue_service") and self.queue_service:
+                    self.queue_service.mark_source_completed(
+                        brand, model, source, Config.PAGES_PER_SESSION, saved_count
+                    )
+                elif hasattr(self, "mark_source_completed"):
+                    self.mark_source_completed(
+                        brand, model, source, Config.PAGES_PER_SESSION, saved_count
+                    )
 
-            return saved_count
+            return saved_count or False
 
         except Exception as e:
 <<<<<<< HEAD
@@ -489,8 +560,12 @@ class AutoReviewsParser:
 =======
             ERROR_COUNTER.inc()
             logging.error(f"Критическая ошибка парсинга {brand} {model} {source}: {e}")
+<<<<<<< HEAD
 >>>>>>> origin/codex/create-docker-folder-with-configuration-files
             return 0
+=======
+            return False
+>>>>>>> origin/codex/create-parser_service-and-new-services
 
     def run_parsing_session(
         self, max_sources: int = 10, session_duration_hours: int = 2
@@ -510,7 +585,7 @@ class AutoReviewsParser:
 
         while sources_processed < max_sources and datetime.now() < session_end:
             # Получаем следующий источник
-            source_info = self.get_next_source()
+            source_info = self.queue_service.get_next_source()
 
             if not source_info:
                 print("\n✅ Все источники обработаны!")
@@ -524,7 +599,7 @@ class AutoReviewsParser:
                 print(
                     f"  ⚠️ Лимит отзывов для {brand} {model} достигнут ({current_count})"
                 )
-                self.mark_source_completed(brand, model, source, 0, 0)
+                self.queue_service.mark_source_completed(brand, model, source, 0, 0)
                 continue
 
             # Парсим источник
@@ -611,6 +686,7 @@ class AutoReviewsParser:
 # ==================== УТИЛИТЫ УПРАВЛЕНИЯ ====================
 
 
+<<<<<<< HEAD
 class ParserManager:
     """Менеджер для управления парсером"""
 
@@ -697,6 +773,8 @@ class ParserManager:
             print(f"❌ Неподдерживаемый формат: {output_format}")
 
 
+=======
+>>>>>>> origin/codex/create-parser_service-and-new-services
 # ==================== ГЛАВНАЯ ФУНКЦИЯ ====================
 
 
@@ -734,28 +812,30 @@ def main():
 
     args = parser.parse_args()
 
-    manager = ParserManager()
+    from src.services.parser_service import ParserService
+
+    service = ParserService()
 
     if args.command == "init":
         print("🚀 Инициализация парсера...")
-        manager.reset_queue()
+        service.reset_queue()
         print("✅ Парсер готов к работе!")
 
     elif args.command == "parse":
         print("🎯 Запуск разовой сессии парсинга...")
-        manager.parser.run_parsing_session(max_sources=args.sources)
+        service.parser.run_parsing_session(max_sources=args.sources)
 
     elif args.command == "continuous":
         print("🔄 Запуск непрерывного парсинга...")
-        manager.parser.run_continuous_parsing(
+        service.parser.run_continuous_parsing(
             daily_sessions=args.sessions, session_sources=args.sources
         )
 
     elif args.command == "status":
-        manager.show_status()
+        service.show_status()
 
     elif args.command == "export":
-        manager.export_data(output_format=args.format)
+        service.export_data(output_format=args.format)
 
 
 if __name__ == "__main__":
