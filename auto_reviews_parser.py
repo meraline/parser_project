@@ -734,26 +734,34 @@ class AutoReviewsParser:
             'model': model,
             'max_pages': Config.PAGES_PER_SESSION
         }
-        
+
         try:
             if source == 'drom.ru':
                 reviews = self.drom_parser.parse_brand_model_reviews(data)
             elif source == 'drive2.ru':
                 reviews = self.drive2_parser.parse_brand_model_reviews(data)
-            
+
+            if reviews is None:
+                logging.warning(
+                    f"Парсер {source} вернул None для {brand} {model}"
+                )
+                return False
+
             # Сохраняем отзывы в базу
             saved_count = 0
             for review in reviews:
                 if self.db.save_review(review):
                     saved_count += 1
-            
+
             print(f"  💾 Сохранено {saved_count} из {len(reviews)} отзывов")
-            
+
             # Отмечаем источник как завершенный
-            self.mark_source_completed(brand, model, source, Config.PAGES_PER_SESSION, saved_count)
-            
-            return saved_count
-            
+            self.mark_source_completed(
+                brand, model, source, Config.PAGES_PER_SESSION, saved_count
+            )
+
+            return saved_count if reviews else False
+
         except Exception as e:
             logging.error(f"Критическая ошибка парсинга {brand} {model} {source}: {e}")
             return 0
@@ -1003,242 +1011,5 @@ def main():
         manager.export_data(output_format=args.format)
 
 if __name__ == "__main__":
-    main()swith('http'):
-                        next_url = urljoin(base_url, next_url)
-                    
-                    driver.get_via_this_page(next_url)
-                    self.random_delay()
-                    current_page += 1
-                else:
-                    break
-            
-            print(f"  ✓ Drom.ru: Собрано {len(reviews)} отзывов для {brand} {model}")
-            
-        except Exception as e:
-            logging.error(f"Ошибка парсинга Drom.ru {brand} {model}: {e}")
-            self.session_stats['errors'] += 1
-        
-        return reviews
+    main()
     
-    def _parse_review_card(self, card, brand: str, model: str, base_url: str) -> Optional[ReviewData]:
-        """Парсинг одной карточки отзыва"""
-        try:
-            review = ReviewData(
-                source="drom.ru",
-                type="review",
-                brand=brand,
-                model=model
-            )
-            
-            # Заголовок и ссылка
-            title_link = card.select('h3 a') or card.select('a[data-ftid="component_reviews-item-title"]')
-            if title_link:
-                review.title = self.normalize_text(title_link.get_text())
-                href = title_link.get_attribute('href')
-                if href:
-                    review.url = urljoin(base_url, href)
-            
-            # Рейтинг
-            rating_elem = card.select('.css-kxziuu') or card.select('[data-ftid="component_rating"]')
-            if rating_elem:
-                rating_text = rating_elem.get_text()
-                rating_match = re.search(r'(\d+(?:\.\d+)?)', rating_text)
-                if rating_match:
-                    review.rating = float(rating_match.group(1))
-            
-            # Автор
-            author_elem = card.select('.css-username') or card.select('[data-ftid="component_username"]')
-            if author_elem:
-                review.author = self.normalize_text(author_elem.get_text())
-            
-            # Информация об автомобиле
-            specs_elem = card.select('.css-1x4jntm') or card.select('.css-car-info')
-            if specs_elem:
-                specs_text = specs_elem.get_text()
-                
-                # Извлекаем характеристики
-                review.year = self.extract_year(specs_text)
-                review.engine_volume = self.extract_engine_volume(specs_text)
-                review.mileage = self.extract_mileage(specs_text)
-                
-                # Тип топлива
-                if 'бензин' in specs_text.lower():
-                    review.fuel_type = 'бензин'
-                elif 'дизель' in specs_text.lower():
-                    review.fuel_type = 'дизель'
-                elif 'гибрид' in specs_text.lower():
-                    review.fuel_type = 'гибрид'
-                
-                # Коробка передач
-                if 'автомат' in specs_text.lower() or 'акпп' in specs_text.lower():
-                    review.transmission = 'автомат'
-                elif 'механик' in specs_text.lower() or 'мкпп' in specs_text.lower():
-                    review.transmission = 'механика'
-                elif 'вариатор' in specs_text.lower():
-                    review.transmission = 'вариатор'
-            
-            # Краткое содержание
-            content_elem = card.select('.css-1wdvlz0') or card.select('.review-preview')
-            if content_elem:
-                review.content = self.normalize_text(content_elem.get_text())
-            
-            # Дата публикации
-            date_elem = card.select('.css-date') or card.select('[data-ftid="component_date"]')
-            if date_elem:
-                date_text = date_elem.get_text()
-                review.publish_date = self._parse_date(date_text)
-            
-            return review if review.url else None
-            
-        except Exception as e:
-            logging.error(f"Ошибка парсинга карточки отзыва Drom: {e}")
-            return None
-    
-    def _parse_date(self, date_text: str) -> Optional[datetime]:
-        """Парсинг даты из текста"""
-        try:
-            # Убираем лишние символы
-            date_text = re.sub(r'[^\d\.\s\w]', '', date_text).strip()
-            
-            # Различные форматы дат
-            patterns = [
-                r'(\d{1,2})\.(\d{1,2})\.(\d{4})',  # 01.01.2023
-                r'(\d{1,2})\s+(\w+)\s+(\d{4})',   # 1 января 2023
-                r'(\d{4})-(\d{2})-(\d{2})',       # 2023-01-01
-            ]
-            
-            months_map = {
-                'января': 1, 'февраля': 2, 'марта': 3, 'апреля': 4,
-                'мая': 5, 'июня': 6, 'июля': 7, 'августа': 8,
-                'сентября': 9, 'октября': 10, 'ноября': 11, 'декабря': 12
-            }
-            
-            for pattern in patterns:
-                match = re.search(pattern, date_text)
-                if match:
-                    groups = match.groups()
-                    
-                    if len(groups) == 3:
-                        if groups[1].isdigit():  # Формат dd.mm.yyyy
-                            day, month, year = map(int, groups)
-                        else:  # Формат с названием месяца
-                            day = int(groups[0])
-                            month = months_map.get(groups[1].lower(), 1)
-                            year = int(groups[2])
-                        
-                        return datetime(year, month, day)
-            
-        except Exception:
-            pass
-        
-        return None
-
-@browser(
-    block_images=True,
-    cache=True,
-    reuse_driver=True,
-    max_retry=3,
-    user_agent=random.choice(Config.USER_AGENTS),
-    headless=True
-)
-class Drive2Parser(BaseParser):
-    """Парсер отзывов и бортжурналов с Drive2.ru"""
-    
-    def parse_brand_model_reviews(self, driver: Driver, data: Dict) -> List[ReviewData]:
-        """Парсинг отзывов для конкретной марки и модели"""
-        brand = data['brand']
-        model = data['model']
-        max_pages = data.get('max_pages', 50)
-        
-        reviews = []
-        
-        # Парсим и отзывы, и бортжурналы
-        for content_type in ['experience', 'logbook']:
-            try:
-                type_reviews = self._parse_content_type(driver, brand, model, content_type, max_pages // 2)
-                reviews.extend(type_reviews)
-                self.random_delay(5, 10)  # Пауза между типами контента
-                
-            except Exception as e:
-                logging.error(f"Ошибка парсинга {content_type} Drive2.ru {brand} {model}: {e}")
-                self.session_stats['errors'] += 1
-        
-        return reviews
-    
-    def _parse_content_type(self, driver: Driver, brand: str, model: str, content_type: str, max_pages: int) -> List[ReviewData]:
-        """Парсинг конкретного типа контента"""
-        reviews = []
-        
-        # URL в зависимости от типа контента
-        if content_type == 'experience':
-            base_url = f"https://www.drive2.ru/experience/{brand}/{model}/"
-            review_type = "review"
-        else:  # logbook
-            base_url = f"https://www.drive2.ru/cars/{brand}/{model}/logbook/"
-            review_type = "board_journal"
-        
-        print(f"  🔍 Drive2.ru: Парсинг {review_type} {brand} {model}")
-        
-        try:
-            driver.google_get(base_url, bypass_cloudflare=True)
-            self.random_delay(3, 7)
-            
-            # Проверяем наличие ошибки
-            if driver.select('.c-error') or "404" in driver.title:
-                print(f"    ⚠️ Страница не найдена: {base_url}")
-                return reviews
-            
-            current_page = 1
-            
-            while current_page <= max_pages:
-                print(f"    📄 Страница {current_page} ({review_type})")
-                
-                # Ищем карточки
-                if content_type == 'experience':
-                    cards = driver.select_all('.c-car-card')
-                else:
-                    cards = driver.select_all('.c-post-card') or driver.select_all('.c-logbook-card')
-                
-                if not cards:
-                    print(f"    ⚠️ Контент не найден на странице {current_page}")
-                    break
-                
-                page_reviews = 0
-                
-                for card in cards:
-                    try:
-                        review = self._parse_drive2_card(card, brand, model, review_type, base_url)
-                        if review and not self.db.is_url_parsed(review.url):
-                            reviews.append(review)
-                            page_reviews += 1
-                        
-                    except Exception as e:
-                        self.session_stats['errors'] += 1
-                        logging.error(f"Ошибка парсинга карточки Drive2: {e}")
-                
-                print(f"    ✓ Найдено {page_reviews} новых записей")
-                
-                # Поиск следующей страницы
-                next_link = driver.select('.c-pagination__next') or driver.select('a[rel="next"]')
-                if not next_link or 'disabled' in next_link.get_attribute('class', ''):
-                    print(f"    📋 Больше страниц нет")
-                    break
-                
-                # Переходим на следующую страницу
-                next_url = next_link.get_attribute('href')
-                if next_url:
-                    if not next_url.startswith('http'):
-                        next_url = base_url + next_url
-                    driver.google_get(next_url, bypass_cloudflare=True)
-                    self.random_delay(3, 7)
-                    current_page += 1
-                
-                else:
-                    print(f"    📋 Больше страниц нет")
-                    break
-            
-        except Exception as e:
-            logging.error(f"Ошибка парсинга Drive2.ru {brand} {model}: {e}")
-            self.session_stats['errors'] += 1
-        
-        return reviews
