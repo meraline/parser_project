@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from auto_reviews_parser import AutoReviewsParser, Config
+from .auto_reviews_parser import AutoReviewsParser, Config
 
 from .queue_service import QueueService
 from .export_service import ExportService

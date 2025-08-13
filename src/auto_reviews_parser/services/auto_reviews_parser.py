@@ -23,7 +23,7 @@ from botasaurus.soupify import soupify
 from botasaurus import bt
 from .parallel_parser import ParallelParserService
 
-from utils.metrics import setup_metrics
+from ..utils.metrics import setup_metrics
 
 # ==================== НАСТРОЙКИ ====================
 
@@ -76,7 +76,7 @@ class Config:
 
 # ==================== МОДЕЛИ ДАННЫХ ====================
 
-from src.models import Review
+from ..models import Review
 
 # ==================== БАЗА ДАННЫХ ====================
 
@@ -302,7 +302,7 @@ class ReviewsDatabase:
 # ==================== ПАРСЕРЫ ====================
 
 
-from parsers import DromParser, Drive2Parser
+from ..parsers import DromParser, Drive2Parser
 
 
 # ==================== ГЛАВНЫЙ ПАРСЕР ====================

@@ -3,7 +3,7 @@ import sqlite3
 from typing import Dict, Optional
 
 from ..base import Database
-from parsers.models import Review
+from ...parsers import Review
 
 
 class ReviewRepository:

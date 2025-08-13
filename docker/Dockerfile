@@ -4,5 +4,5 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
-CMD ["python", "auto_reviews_parser.py", "continuous", "--sessions", "2", "--sources", "5"]
+CMD ["python", "cli/main.py", "continuous", "--sessions", "2", "--sources", "5"]
 

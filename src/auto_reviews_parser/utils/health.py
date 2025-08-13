@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from auto_reviews_parser import ReviewsDatabase
+from ..services.auto_reviews_parser import ReviewsDatabase
 
 
 METRICS_URL = "http://localhost:8000/metrics"
