@@ -13,6 +13,17 @@ python auto_reviews_parser.py init
 python auto_reviews_parser.py parse --sources 3
 ```
 
+## Environment variables
+
+The application reads configuration from environment variables (or a `.env` file). Key settings:
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `DB_PATH` | `auto_reviews.db` | Path to the SQLite database |
+| `PROMETHEUS_PORT` | `8000` | Port where Prometheus metrics are exposed |
+| `REDIS_URL` | `redis://localhost:6379/0` | Redis connection URL |
+| `MAX_WORKERS` | `4` | Number of worker threads for parallel parsing |
+
 ## Prometheus metrics
 
 The parser exposes metrics using [`prometheus-client`](https://github.com/prometheus/client_python). By default metrics are available on `http://localhost:${PROMETHEUS_PORT}`.
