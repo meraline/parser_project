@@ -7,11 +7,11 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.models import ReviewData
+from src.models import Review
 
 
 def test_parsed_at_auto_set():
-    review = ReviewData(
+    review = Review(
         source="drom.ru",
         type="review",
         brand="toyota",
@@ -26,7 +26,7 @@ def test_content_hash_md5_known_values():
     url = "http://example.com/review1"
     title = "Great car"
     content = "a" * 150
-    review = ReviewData(
+    review = Review(
         source="drom.ru",
         type="review",
         brand="toyota",

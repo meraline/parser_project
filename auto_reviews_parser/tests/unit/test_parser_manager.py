@@ -62,7 +62,7 @@ botasaurus_pkg.request = request_module
 botasaurus_pkg.soupify = soupify_module
 botasaurus_pkg.bt = bt_module
 
-from src.services import AutoReviewsParser
+from services.auto_reviews_parser import AutoReviewsParser
 
 
 @pytest.mark.parametrize("source", ["drom.ru", "drive2.ru"])

@@ -5,15 +5,15 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
 from .base import BaseParser
-from .models import ReviewData
+from .models import Review
 
 
 class Drive2Parser(BaseParser):
     """Parser for reviews and logbook entries from drive2.ru."""
 
-    async def parse_reviews(self, html: str, brand: str, model: str) -> List[ReviewData]:
+    async def parse_reviews(self, html: str, brand: str, model: str) -> List[Review]:
         soup = BeautifulSoup(html, "html.parser")
-        reviews: List[ReviewData] = []
+        reviews: List[Review] = []
 
         cards_exp = soup.select('.c-car-card')
         cards_log = soup.select('.c-post-card, .c-logbook-card')
@@ -27,8 +27,8 @@ class Drive2Parser(BaseParser):
         await self.random_delay()
         return reviews
 
-    def _parse_card(self, card, brand: str, model: str, review_type: str) -> ReviewData:
-        review = ReviewData(source="drive2.ru", type=review_type, brand=brand, model=model)
+    def _parse_card(self, card, brand: str, model: str, review_type: str) -> Review:
+        review = Review(source="drive2.ru", type=review_type, brand=brand, model=model)
 
         title_link = (
             card.select_one("a.c-car-card__caption")

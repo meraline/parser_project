@@ -7,8 +7,8 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.database.reviews_database import ReviewsDatabase
-from src.models import ReviewData
+from database.reviews_database import ReviewsDatabase
+from src.models import Review
 
 
 def test_init_database_creates_tables(tmp_path):
@@ -25,7 +25,7 @@ def test_init_database_creates_tables(tmp_path):
 def test_insert_and_duplicate_review(tmp_path):
     db_path = tmp_path / "test.db"
     db = ReviewsDatabase(str(db_path))
-    review = ReviewData(
+    review = Review(
         source="drom.ru",
         type="review",
         brand="Toyota",

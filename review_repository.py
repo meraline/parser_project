@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from parsers import ReviewData
+from parsers import Review
 from auto_reviews_parser import ReviewsDatabase
 
 
@@ -14,11 +14,11 @@ class ReviewRepository:
     def __init__(self, db: ReviewsDatabase):
         self._db = db
 
-    def save(self, review: ReviewData) -> bool:
+    def save(self, review: Review) -> bool:
         """Persist a single review to the database."""
         return self._db.save_review(review)
 
-    def save_many(self, reviews: Iterable[ReviewData]) -> int:
+    def save_many(self, reviews: Iterable[Review]) -> int:
         """Persist multiple reviews and return number of saved items."""
         count = 0
         for review in reviews:
@@ -32,4 +32,3 @@ class ReviewRepository:
 
 
 __all__ = ["ReviewRepository"]
-

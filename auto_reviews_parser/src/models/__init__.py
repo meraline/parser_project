@@ -1,3 +1,3 @@
-from .review_data import ReviewData
+from src.models import Review
 
-__all__ = ["ReviewData"]
+__all__ = ["Review"]
