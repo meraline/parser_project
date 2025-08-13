@@ -5,6 +5,7 @@ from urllib.parse import urljoin
 from botasaurus.browser import browser, Driver
 
 from .base_parser import BaseParser
+from src.utils.metrics import track_parsing
 <<<<<<< HEAD:parsers/drive2_parser.py
 <<<<<<< HEAD
 from .models import ReviewData
@@ -23,6 +24,7 @@ from src.models import ReviewData
 class Drive2Parser(BaseParser):
     """Парсер отзывов и бортжурналов с Drive2.ru"""
 
+    @track_parsing("drive2.ru")
     @browser(
         block_images=True,
         cache=False,

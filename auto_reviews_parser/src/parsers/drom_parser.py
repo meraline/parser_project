@@ -5,6 +5,7 @@ from urllib.parse import urljoin
 from botasaurus.browser import browser, Driver
 
 from .base_parser import BaseParser
+from src.utils.metrics import track_parsing
 <<<<<<< HEAD:parsers/drom_parser.py
 <<<<<<< HEAD
 from .models import ReviewData
@@ -23,6 +24,7 @@ from src.models import ReviewData
 class DromParser(BaseParser):
     """Парсер отзывов с Drom.ru"""
 
+    @track_parsing("drom.ru")
     @browser(
         block_images=True,
         cache=False,
