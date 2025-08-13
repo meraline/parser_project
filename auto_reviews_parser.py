@@ -393,6 +393,8 @@ class BaseParser:
 # )
 class DromParser(BaseParser):
     """Парсер отзывов с Drom.ru"""
+
+    @staticmethod
     @browser(
         block_images=True,
         cache=False,
@@ -401,80 +403,81 @@ class DromParser(BaseParser):
         user_agent=random.choice(Config.USER_AGENTS),
         headless=True,
     )
-    def parse_brand_model_reviews(self, driver: Driver, data: Dict) -> List[ReviewData]:
+    def parse_brand_model_reviews(driver: Driver, data: Dict, parser) -> List[ReviewData]:
         """Парсинг отзывов для конкретной марки и модели"""
         brand = data['brand']
         model = data['model']
         max_pages = data.get('max_pages', 50)
-        
+
         reviews = []
         base_url = f"https://www.drom.ru/reviews/{brand}/{model}/"
-        
+
         try:
             print(f"  🔍 Drom.ru: Парсинг отзывов {brand} {model}")
-            
+
             # Переходим на страницу отзывов
             driver.google_get(base_url, bypass_cloudflare=True)
-            self.random_delay(3, 7)
-            
+            parser.random_delay(3, 7)
+
             # Проверяем, что страница загрузилась корректно
             if driver.select('.error-page') or "404" in driver.title:
                 print(f"    ⚠️ Страница не найдена: {base_url}")
                 return reviews
-            
+
             # Парсим все страницы
             current_page = 1
-            
+
             while current_page <= max_pages:
                 print(f"    📄 Страница {current_page}")
-                
+
                 # Ищем карточки отзывов
                 review_cards = driver.select_all('[data-ftid="component_reviews-item"]')
                 if not review_cards:
                     review_cards = driver.select_all('.css-1ksh4lf')
-                
+
                 if not review_cards:
                     print(f"    ⚠️ Отзывы не найдены на странице {current_page}")
                     break
-                
+
                 page_reviews = 0
-                
+
                 for card in review_cards:
                     try:
-                        review = self._parse_review_card(card, brand, model, base_url)
-                        if review and not self.db.is_url_parsed(review.url):
+                        review = parser._parse_review_card(card, brand, model, base_url)
+                        if review and not parser.db.is_url_parsed(review.url):
                             reviews.append(review)
                             page_reviews += 1
-                        
+
                     except Exception as e:
-                        self.session_stats['errors'] += 1
+                        parser.session_stats['errors'] += 1
                         logging.error(f"Ошибка парсинга карточки отзыва: {e}")
-                
+
                 print(f"    ✓ Найдено {page_reviews} новых отзывов")
-                
+
                 # Ищем ссылку на следующую страницу
                 next_link = driver.select('a[rel="next"]')
                 if not next_link:
                     print(f"    📋 Больше страниц нет")
                     break
-                
+
                 # Переходим на следующую страницу
                 next_url = next_link.get_attribute('href')
                 if next_url:
                     if not next_url.startswith('http'):
                         next_url = urljoin(base_url, next_url)
-                    
+
                     driver.get_via_this_page(next_url)
-                    self.random_delay()
+                    parser.random_delay()
                     current_page += 1
                 else:
                     break
-        
+
+            print(f"  ✓ Drom.ru: Собрано {len(reviews)} отзывов для {brand} {model}")
+
         except Exception as e:
-            logging.error(f"Ошибка парсинга Drive2.ru {content_type} {brand} {model}: {e}")
-            self.session_stats['errors'] += 1
-        
-        print(f"  ✓ Drive2.ru: Собрано {len(reviews)} записей ({review_type}) для {brand} {model}")
+            logging.error(f"Ошибка парсинга Drom.ru {brand} {model}: {e}")
+            parser.session_stats['errors'] += 1
+
         return reviews
     
     def _parse_drive2_card(self, card, brand: str, model: str, review_type: str, base_url: str) -> Optional[ReviewData]:
@@ -737,9 +740,13 @@ class AutoReviewsParser:
         
         try:
             if source == 'drom.ru':
-                reviews = self.drom_parser.parse_brand_model_reviews(data)
+                reviews = self.drom_parser.parse_brand_model_reviews(
+                    data, metadata=self.drom_parser
+                )
             elif source == 'drive2.ru':
-                reviews = self.drive2_parser.parse_brand_model_reviews(data)
+                reviews = self.drive2_parser.parse_brand_model_reviews(
+                    data, metadata=self.drive2_parser
+                )
             
             # Сохраняем отзывы в базу
             saved_count = 0
@@ -1133,36 +1140,41 @@ if __name__ == "__main__":
         
         return None
 
-@browser(
-    block_images=True,
-    cache=True,
-    reuse_driver=True,
-    max_retry=3,
-    user_agent=random.choice(Config.USER_AGENTS),
-    headless=True
-)
 class Drive2Parser(BaseParser):
     """Парсер отзывов и бортжурналов с Drive2.ru"""
-    
-    def parse_brand_model_reviews(self, driver: Driver, data: Dict) -> List[ReviewData]:
+
+    @staticmethod
+    @browser(
+        block_images=True,
+        cache=True,
+        reuse_driver=True,
+        max_retry=3,
+        user_agent=random.choice(Config.USER_AGENTS),
+        headless=True,
+    )
+    def parse_brand_model_reviews(driver: Driver, data: Dict, parser) -> List[ReviewData]:
         """Парсинг отзывов для конкретной марки и модели"""
         brand = data['brand']
         model = data['model']
         max_pages = data.get('max_pages', 50)
-        
+
         reviews = []
-        
+
         # Парсим и отзывы, и бортжурналы
         for content_type in ['experience', 'logbook']:
             try:
-                type_reviews = self._parse_content_type(driver, brand, model, content_type, max_pages // 2)
+                type_reviews = parser._parse_content_type(
+                    driver, brand, model, content_type, max_pages // 2
+                )
                 reviews.extend(type_reviews)
-                self.random_delay(5, 10)  # Пауза между типами контента
-                
+                parser.random_delay(5, 10)  # Пауза между типами контента
+
             except Exception as e:
-                logging.error(f"Ошибка парсинга {content_type} Drive2.ru {brand} {model}: {e}")
-                self.session_stats['errors'] += 1
-        
+                logging.error(
+                    f"Ошибка парсинга {content_type} Drive2.ru {brand} {model}: {e}"
+                )
+                parser.session_stats['errors'] += 1
+
         return reviews
     
     def _parse_content_type(self, driver: Driver, brand: str, model: str, content_type: str, max_pages: int) -> List[ReviewData]:
