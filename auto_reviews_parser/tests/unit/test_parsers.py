@@ -1,5 +1,3 @@
-<<<<<<<< HEAD:auto_reviews_parser/tests/unit/unit/test_parsers.py
-========
 import sys
 import types
 from pathlib import Path
@@ -8,14 +6,8 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
->>>>>>>> origin/codex/restructure-project-directory-and-update-imports:auto_reviews_parser/tests/unit/test_parsers.py
 from bs4 import BeautifulSoup
-from unittest.mock import MagicMock
 
-<<<<<<<< HEAD:auto_reviews_parser/tests/unit/unit/test_parsers.py
-from parsers.drom_parser import DromParser
-from parsers.drive2_parser import Drive2Parser
-========
 # Stub out botasaurus modules to avoid heavy dependencies during import
 botsaurus = types.ModuleType("botasaurus")
 
@@ -67,7 +59,6 @@ sys.modules.setdefault("botasaurus.bt", bt_mod)
 # Import parser classes from the project module
 from src.parsers.drom_parser import DromParser
 from src.parsers.drive2_parser import Drive2Parser
->>>>>>>> origin/codex/restructure-project-directory-and-update-imports:auto_reviews_parser/tests/unit/test_parsers.py
 
 
 class MockElement:

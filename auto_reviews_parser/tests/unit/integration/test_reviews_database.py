@@ -1,29 +1,12 @@
 import sqlite3
 import pytest
 
-<<<<<<<< HEAD:auto_reviews_parser/tests/unit/integration/test_reviews_database.py
 from parsers.models import ReviewData
 from auto_reviews_parser import ReviewsDatabase
 
 
-<<<<<<< HEAD:tests/integration/test_reviews_database.py
 def test_init_database_creates_tables(test_db):
     conn = sqlite3.connect(test_db.db_path)
-=======
-db_module = load_db_module()
-Review = db_module.Review
-ReviewsDatabase = db_module.ReviewsDatabase
-========
-from src.database import ReviewsDatabase
-from src.models import ReviewData
->>>>>>>> origin/codex/restructure-project-directory-and-update-imports:auto_reviews_parser/tests/unit/test_reviews_database.py
-
-
-def test_init_database_creates_tables(tmp_path):
-    db_path = tmp_path / "test.db"
-    db = ReviewsDatabase(str(db_path))
-    conn = sqlite3.connect(db.db_path)
->>>>>>> origin/codex/create-review-model-and-update-parsers:tests/test_reviews_database.py
     cursor = conn.cursor()
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
     tables = {row[0] for row in cursor.fetchall()}

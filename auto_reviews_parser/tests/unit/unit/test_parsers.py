@@ -1,73 +1,8 @@
-<<<<<<<< HEAD:auto_reviews_parser/tests/unit/unit/test_parsers.py
-========
-import sys
-import types
-from pathlib import Path
-from unittest.mock import MagicMock
-ROOT_DIR = Path(__file__).resolve().parents[2]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
-
->>>>>>>> origin/codex/restructure-project-directory-and-update-imports:auto_reviews_parser/tests/unit/test_parsers.py
 from bs4 import BeautifulSoup
 from unittest.mock import MagicMock
 
-<<<<<<<< HEAD:auto_reviews_parser/tests/unit/unit/test_parsers.py
 from parsers.drom_parser import DromParser
 from parsers.drive2_parser import Drive2Parser
-========
-# Stub out botasaurus modules to avoid heavy dependencies during import
-botsaurus = types.ModuleType("botasaurus")
-
-browser_mod = types.ModuleType("botasaurus.browser")
-
-def browser(*args, **kwargs):
-    def decorator(func):
-        return func
-    return decorator
-
-class Driver:  # placeholder for type hints
-    pass
-
-browser_mod.browser = browser
-browser_mod.Driver = Driver
-
-request_mod = types.ModuleType("botasaurus.request")
-class Request:  # minimal placeholder
-    pass
-
-def request(*args, **kwargs):
-    return None
-request_mod.Request = Request
-request_mod.request = request
-
-soupify_mod = types.ModuleType("botasaurus.soupify")
-
-def soupify(*args, **kwargs):
-    return None
-soupify_mod.soupify = soupify
-
-bt_mod = types.ModuleType("botasaurus.bt")
-
-def write_excel(*args, **kwargs):
-    return None
-
-def write_json(*args, **kwargs):
-    return None
-bt_mod.write_excel = write_excel
-bt_mod.write_json = write_json
-
-# Register stub modules
-sys.modules.setdefault("botasaurus", botsaurus)
-sys.modules.setdefault("botasaurus.browser", browser_mod)
-sys.modules.setdefault("botasaurus.request", request_mod)
-sys.modules.setdefault("botasaurus.soupify", soupify_mod)
-sys.modules.setdefault("botasaurus.bt", bt_mod)
-
-# Import parser classes from the project module
-from src.parsers.drom_parser import DromParser
-from src.parsers.drive2_parser import Drive2Parser
->>>>>>>> origin/codex/restructure-project-directory-and-update-imports:auto_reviews_parser/tests/unit/test_parsers.py
 
 
 class MockElement:
