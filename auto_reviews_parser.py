@@ -22,53 +22,9 @@ from botasaurus.request import request, Request
 from botasaurus.soupify import soupify
 from botasaurus import bt
 
-# ==================== НАСТРОЙКИ ====================
+from src.config.settings import TARGET_BRANDS, settings
 
-
-class Config:
-    """Конфигурация парсера"""
-
-    # База данных
-    DB_PATH = "auto_reviews.db"
-
-    # Задержки (в секундах)
-    MIN_DELAY = 5  # Минимальная задержка между запросами
-    MAX_DELAY = 15  # Максимальная задержка между запросами
-    ERROR_DELAY = 30  # Задержка при ошибке
-    RATE_LIMIT_DELAY = 300  # Задержка при rate limit (5 минут)
-
-    # Ограничения
-    MAX_RETRIES = 3  # Максимальное количество повторов
-    PAGES_PER_SESSION = 50  # Страниц за сессию
-    MAX_REVIEWS_PER_MODEL = 1000  # Максимум отзывов на модель
-
-    # User agents для ротации
-    USER_AGENTS = [
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    ]
-
-    # Список популярных брендов и моделей для парсинга
-    TARGET_BRANDS = {
-        "toyota": ["camry", "corolla", "rav4", "highlander", "prius", "land-cruiser"],
-        "volkswagen": ["polo", "golf", "passat", "tiguan", "touareg", "jetta"],
-        "nissan": ["qashqai", "x-trail", "almera", "teana", "murano", "pathfinder"],
-        "hyundai": ["solaris", "elantra", "tucson", "santa-fe", "creta", "sonata"],
-        "kia": ["rio", "cerato", "sportage", "sorento", "soul", "optima"],
-        "mazda": ["mazda3", "mazda6", "cx-5", "cx-3", "mx-5", "cx-9"],
-        "ford": ["focus", "fiesta", "mondeo", "kuga", "explorer", "ecosport"],
-        "chevrolet": ["cruze", "aveo", "captiva", "lacetti", "tahoe", "suburban"],
-        "skoda": ["octavia", "rapid", "fabia", "superb", "kodiaq", "karoq"],
-        "renault": ["logan", "sandero", "duster", "kaptur", "megane", "fluence"],
-        "mitsubishi": ["lancer", "outlander", "asx", "pajero", "eclipse-cross", "l200"],
-        "honda": ["civic", "accord", "cr-v", "pilot", "fit", "hr-v"],
-        "bmw": ["3-series", "5-series", "x3", "x5", "x1", "1-series"],
-        "mercedes-benz": ["c-class", "e-class", "s-class", "glc", "gle", "gla"],
-        "audi": ["a3", "a4", "a6", "q3", "q5", "q7"],
-        "lada": ["granta", "kalina", "priora", "vesta", "xray", "largus"],
-    }
+# ==================== SETTINGS ====================
 
 
 # ==================== МОДЕЛИ ДАННЫХ ====================
@@ -81,7 +37,7 @@ from parsers import ReviewData
 class ReviewsDatabase:
     """Управление базой данных отзывов"""
 
-    def __init__(self, db_path: str = Config.DB_PATH):
+    def __init__(self, db_path: str = settings.db_path):
         self.db_path = db_path
         self.init_database()
 
@@ -308,7 +264,7 @@ from parsers import DromParser, Drive2Parser
 class AutoReviewsParser:
     """Главный класс парсера отзывов автомобилей"""
 
-    def __init__(self, db_path: str = Config.DB_PATH):
+    def __init__(self, db_path: str = settings.db_path):
         self.db = ReviewsDatabase(db_path)
         self.setup_logging()
         self.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -342,7 +298,7 @@ class AutoReviewsParser:
         cursor.execute("DELETE FROM sources_queue")
 
         # Добавляем все комбинации брендов и моделей
-        for brand, models in Config.TARGET_BRANDS.items():
+        for brand, models in TARGET_BRANDS.items():
             for model in models:
                 for source in ["drom.ru", "drive2.ru"]:
                     cursor.execute(
@@ -357,8 +313,8 @@ class AutoReviewsParser:
         conn.close()
 
         total_sources = (
-            len(Config.TARGET_BRANDS)
-            * sum(len(models) for models in Config.TARGET_BRANDS.values())
+            len(TARGET_BRANDS)
+            * sum(len(models) for models in TARGET_BRANDS.values())
             * 2
         )
         print(f"✅ Инициализирована очередь из {total_sources} источников")
@@ -425,7 +381,7 @@ class AutoReviewsParser:
         print(f"\n🎯 Парсинг: {brand} {model} на {source}")
 
         reviews = []
-        data = {"brand": brand, "model": model, "max_pages": Config.PAGES_PER_SESSION}
+        data = {"brand": brand, "model": model, "max_pages": settings.pages_per_session}
 
         try:
             if source == "drom.ru":
@@ -452,7 +408,7 @@ class AutoReviewsParser:
 
             # Отмечаем источник как завершенный
             self.mark_source_completed(
-                brand, model, source, Config.PAGES_PER_SESSION, saved_count
+                brand, model, source, settings.pages_per_session, saved_count
             )
 
             return saved_count
@@ -489,7 +445,7 @@ class AutoReviewsParser:
 
             # Проверяем лимит отзывов для модели
             current_count = self.db.get_reviews_count(brand, model)
-            if current_count >= Config.MAX_REVIEWS_PER_MODEL:
+            if current_count >= settings.max_reviews_per_model:
                 print(
                     f"  ⚠️ Лимит отзывов для {brand} {model} достигнут ({current_count})"
                 )
@@ -515,7 +471,7 @@ class AutoReviewsParser:
                 sources_processed += 1
 
                 # Увеличенная пауза при ошибке
-                time.sleep(Config.ERROR_DELAY)
+                time.sleep(settings.error_delay)
 
         # Статистика сессии
         session_duration = datetime.now() - session_start
@@ -583,7 +539,7 @@ class AutoReviewsParser:
 class ParserManager:
     """Менеджер для управления парсером"""
 
-    def __init__(self, db_path: str = Config.DB_PATH):
+    def __init__(self, db_path: str = settings.db_path):
         self.parser = AutoReviewsParser(db_path)
 
     def show_status(self):
