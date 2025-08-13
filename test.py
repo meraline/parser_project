@@ -495,6 +495,14 @@ class BaseParser:
         return None
 
 
+@browser(
+    block_images=True,
+    cache=True,
+    reuse_driver=True,
+    max_retry=3,
+    user_agent=random.choice(Config.USER_AGENTS),
+    headless=True,
+)
 class DromParser(BaseParser):
     """Парсер отзывов с Drom.ru"""
 
@@ -506,6 +514,7 @@ class DromParser(BaseParser):
         user_agent=random.choice(Config.USER_AGENTS),
         headless=True,
     )
+
     def parse_brand_model_reviews(self, driver: Driver, data: Dict) -> List[ReviewData]:
         """Парсинг отзывов для конкретной марки и модели"""
         brand = data["brand"]
