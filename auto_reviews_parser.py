@@ -73,7 +73,51 @@ class Config:
 
 # ==================== МОДЕЛИ ДАННЫХ ====================
 
-from parsers import ReviewData
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Optional
+import hashlib
+
+
+@dataclass
+class ReviewData:
+    """Структура данных отзыва"""
+
+    source: str  # drom.ru, drive2.ru
+    type: str  # review, board_journal
+    brand: str
+    model: str
+    generation: Optional[str] = None
+    year: Optional[int] = None
+    url: str = ""
+    title: str = ""
+    content: str = ""
+    author: str = ""
+    rating: Optional[float] = None
+    pros: str = ""
+    cons: str = ""
+    mileage: Optional[int] = None
+    engine_volume: Optional[float] = None
+    fuel_type: str = ""
+    transmission: str = ""
+    body_type: str = ""
+    drive_type: str = ""
+    publish_date: Optional[datetime] = None
+    views_count: Optional[int] = None
+    likes_count: Optional[int] = None
+    comments_count: Optional[int] = None
+    parsed_at: datetime = None
+    content_hash: str = ""
+
+    def __post_init__(self):
+        if self.parsed_at is None:
+            self.parsed_at = datetime.now()
+        content_for_hash = (
+            f"{self.url}_{self.title}_{self.content[:100] if self.content else ''}"
+        )
+        self.content_hash = hashlib.md5(content_for_hash.encode()).hexdigest()
+
+from src.services.queue_service import QueueService
 
 # ==================== БАЗА ДАННЫХ ====================
 
@@ -308,8 +352,9 @@ from parsers import DromParser, Drive2Parser
 class AutoReviewsParser:
     """Главный класс парсера отзывов автомобилей"""
 
-    def __init__(self, db_path: str = Config.DB_PATH):
+    def __init__(self, db_path: str = Config.DB_PATH, queue_service: Optional[QueueService] = None):
         self.db = ReviewsDatabase(db_path)
+        self.queue_service = queue_service or QueueService(self.db.db_path, Config.TARGET_BRANDS)
         self.setup_logging()
         self.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -333,92 +378,6 @@ class AutoReviewsParser:
             ],
         )
 
-    def initialize_sources_queue(self):
-        """Инициализация очереди источников для парсинга"""
-        conn = sqlite3.connect(self.db.db_path)
-        cursor = conn.cursor()
-
-        # Очищаем старую очередь
-        cursor.execute("DELETE FROM sources_queue")
-
-        # Добавляем все комбинации брендов и моделей
-        for brand, models in Config.TARGET_BRANDS.items():
-            for model in models:
-                for source in ["drom.ru", "drive2.ru"]:
-                    cursor.execute(
-                        """
-                        INSERT INTO sources_queue (brand, model, source, priority)
-                        VALUES (?, ?, ?, ?)
-                    """,
-                        (brand, model, source, 1),
-                    )
-
-        conn.commit()
-        conn.close()
-
-        total_sources = (
-            len(Config.TARGET_BRANDS)
-            * sum(len(models) for models in Config.TARGET_BRANDS.values())
-            * 2
-        )
-        print(f"✅ Инициализирована очередь из {total_sources} источников")
-
-    def get_next_source(self) -> Optional[Tuple[str, str, str]]:
-        """Получение следующего источника для парсинга"""
-        conn = sqlite3.connect(self.db.db_path)
-        cursor = conn.cursor()
-
-        # Ищем неспарсенные источники, сортируем по приоритету
-        cursor.execute(
-            """
-            SELECT id, brand, model, source FROM sources_queue 
-            WHERE status = 'pending' 
-            ORDER BY priority DESC, RANDOM()
-            LIMIT 1
-        """
-        )
-
-        result = cursor.fetchone()
-
-        if result:
-            source_id, brand, model, source = result
-
-            # Отмечаем как обрабатываемый
-            cursor.execute(
-                """
-                UPDATE sources_queue 
-                SET status = 'processing', last_parsed = CURRENT_TIMESTAMP 
-                WHERE id = ?
-            """,
-                (source_id,),
-            )
-
-            conn.commit()
-            conn.close()
-
-            return brand, model, source
-
-        conn.close()
-        return None
-
-    def mark_source_completed(
-        self, brand: str, model: str, source: str, pages_parsed: int, reviews_found: int
-    ):
-        """Отметка источника как завершенного"""
-        conn = sqlite3.connect(self.db.db_path)
-        cursor = conn.cursor()
-
-        cursor.execute(
-            """
-            UPDATE sources_queue 
-            SET status = 'completed', parsed_pages = ?, total_pages = ?
-            WHERE brand = ? AND model = ? AND source = ?
-        """,
-            (pages_parsed, pages_parsed, brand, model, source),
-        )
-
-        conn.commit()
-        conn.close()
 
     def parse_single_source(self, brand: str, model: str, source: str) -> int:
         """Парсинг одного источника"""
@@ -429,12 +388,13 @@ class AutoReviewsParser:
 
         try:
             if source == "drom.ru":
-                # Вызываем метод с передачей экземпляра парсера через metadata
-                reviews = self.drom_parser.parse_brand_model_reviews(
-                    data, metadata=self.drom_parser
-                )
+                try:
+                    reviews = self.drom_parser.parse_brand_model_reviews(
+                        data, metadata=self.drom_parser
+                    )
+                except TypeError:
+                    reviews = self.drom_parser.parse_brand_model_reviews(data)
             elif source == "drive2.ru":
-                # Вызываем метод с правильной сигнатурой
                 reviews = self.drive2_parser.parse_brand_model_reviews(data)
             if reviews is None:
                 logging.warning(
@@ -450,16 +410,22 @@ class AutoReviewsParser:
 
             print(f"  💾 Сохранено {saved_count} из {len(reviews)} отзывов")
 
-            # Отмечаем источник как завершенный
-            self.mark_source_completed(
-                brand, model, source, Config.PAGES_PER_SESSION, saved_count
-            )
+            # Отмечаем источник как завершенный только если есть сохраненные отзывы
+            if saved_count:
+                if hasattr(self, "queue_service") and self.queue_service:
+                    self.queue_service.mark_source_completed(
+                        brand, model, source, Config.PAGES_PER_SESSION, saved_count
+                    )
+                elif hasattr(self, "mark_source_completed"):
+                    self.mark_source_completed(
+                        brand, model, source, Config.PAGES_PER_SESSION, saved_count
+                    )
 
-            return saved_count
+            return saved_count or False
 
         except Exception as e:
             logging.error(f"Критическая ошибка парсинга {brand} {model} {source}: {e}")
-            return 0
+            return False
 
     def run_parsing_session(
         self, max_sources: int = 10, session_duration_hours: int = 2
@@ -479,7 +445,7 @@ class AutoReviewsParser:
 
         while sources_processed < max_sources and datetime.now() < session_end:
             # Получаем следующий источник
-            source_info = self.get_next_source()
+            source_info = self.queue_service.get_next_source()
 
             if not source_info:
                 print("\n✅ Все источники обработаны!")
@@ -493,7 +459,7 @@ class AutoReviewsParser:
                 print(
                     f"  ⚠️ Лимит отзывов для {brand} {model} достигнут ({current_count})"
                 )
-                self.mark_source_completed(brand, model, source, 0, 0)
+                self.queue_service.mark_source_completed(brand, model, source, 0, 0)
                 continue
 
             # Парсим источник
@@ -580,104 +546,6 @@ class AutoReviewsParser:
 # ==================== УТИЛИТЫ УПРАВЛЕНИЯ ====================
 
 
-class ParserManager:
-    """Менеджер для управления парсером"""
-
-    def __init__(self, db_path: str = Config.DB_PATH):
-        self.parser = AutoReviewsParser(db_path)
-
-    def show_status(self):
-        """Показать статус базы данных и очереди"""
-        stats = self.parser.db.get_parsing_stats()
-
-        print(f"\n📊 СТАТУС БАЗЫ ДАННЫХ")
-        print(f"{'='*50}")
-        print(f"Всего отзывов: {stats['total_reviews']:,}")
-        print(f"Уникальных брендов: {stats['unique_brands']}")
-        print(f"Уникальных моделей: {stats['unique_models']}")
-
-        if stats["by_source"]:
-            print(f"\nПо источникам:")
-            for source, count in stats["by_source"].items():
-                print(f"  {source}: {count:,}")
-
-        if stats["by_type"]:
-            print(f"\nПо типам:")
-            for type_name, count in stats["by_type"].items():
-                print(f"  {type_name}: {count:,}")
-
-        # Статистика очереди
-        conn = sqlite3.connect(self.parser.db.db_path)
-        cursor = conn.cursor()
-
-        cursor.execute("SELECT status, COUNT(*) FROM sources_queue GROUP BY status")
-        queue_stats = dict(cursor.fetchall())
-
-        conn.close()
-
-        print(f"\n📋 СТАТУС ОЧЕРЕДИ")
-        print(f"{'='*50}")
-        total_sources = sum(queue_stats.values())
-
-        for status, count in queue_stats.items():
-            percentage = (count / total_sources * 100) if total_sources > 0 else 0
-            print(f"{status}: {count} ({percentage:.1f}%)")
-
-        print(f"Всего источников: {total_sources}")
-
-    def reset_queue(self):
-        """Сброс очереди парсинга"""
-        print("🔄 Сброс очереди парсинга...")
-        self.parser.initialize_sources_queue()
-
-    def export_data(self, output_format: str = "xlsx"):
-        """Экспорт данных из базы"""
-        print(f"📤 Экспорт данных в формате {output_format}...")
-
-        conn = sqlite3.connect(self.parser.db.db_path)
-
-        # Получаем все отзывы
-        query = """
-            SELECT 
-                source, type, brand, model, year, title, author, rating,
-                content, pros, cons, mileage, engine_volume, fuel_type,
-                transmission, body_type, drive_type, publish_date, 
-                views_count, likes_count, comments_count, url, parsed_at
-            FROM reviews
-            ORDER BY brand, model, parsed_at DESC
-        """
-
-        df_data = []
-        cursor = conn.cursor()
-        cursor.execute(query)
-
-        columns = [description[0] for description in cursor.description]
-
-        for row in cursor.fetchall():
-            df_data.append(dict(zip(columns, row)))
-
-        conn.close()
-
-        if not df_data:
-            print("❌ Нет данных для экспорта")
-            return
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-        if output_format.lower() == "xlsx":
-            filename = f"auto_reviews_export_{timestamp}.xlsx"
-            bt.write_excel(df_data, filename.replace(".xlsx", ""))
-            print(f"✅ Данные экспортированы в {filename}")
-
-        elif output_format.lower() == "json":
-            filename = f"auto_reviews_export_{timestamp}.json"
-            bt.write_json(df_data, filename.replace(".json", ""))
-            print(f"✅ Данные экспортированы в {filename}")
-
-        else:
-            print(f"❌ Неподдерживаемый формат: {output_format}")
-
-
 # ==================== ГЛАВНАЯ ФУНКЦИЯ ====================
 
 
@@ -712,28 +580,30 @@ def main():
 
     args = parser.parse_args()
 
-    manager = ParserManager()
+    from src.services.parser_service import ParserService
+
+    service = ParserService()
 
     if args.command == "init":
         print("🚀 Инициализация парсера...")
-        manager.reset_queue()
+        service.reset_queue()
         print("✅ Парсер готов к работе!")
 
     elif args.command == "parse":
         print("🎯 Запуск разовой сессии парсинга...")
-        manager.parser.run_parsing_session(max_sources=args.sources)
+        service.parser.run_parsing_session(max_sources=args.sources)
 
     elif args.command == "continuous":
         print("🔄 Запуск непрерывного парсинга...")
-        manager.parser.run_continuous_parsing(
+        service.parser.run_continuous_parsing(
             daily_sessions=args.sessions, session_sources=args.sources
         )
 
     elif args.command == "status":
-        manager.show_status()
+        service.show_status()
 
     elif args.command == "export":
-        manager.export_data(output_format=args.format)
+        service.export_data(output_format=args.format)
 
 
 if __name__ == "__main__":
