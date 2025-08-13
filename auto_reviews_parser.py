@@ -8,6 +8,7 @@
 import sqlite3
 import time
 import random
+import asyncio
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 import re
@@ -16,6 +17,9 @@ import logging
 from urllib.parse import urljoin, urlparse
 import hashlib
 from pathlib import Path
+from dataclasses import dataclass
+from src.utils.delay_manager import DelayManager
+from src.utils.retry_decorator import retry_async
 
 from botasaurus.browser import browser, Driver
 from botasaurus.request import request, Request
@@ -73,7 +77,44 @@ class Config:
 
 # ==================== МОДЕЛИ ДАННЫХ ====================
 
-from parsers import ReviewData
+
+@dataclass
+class ReviewData:
+    """Структура данных отзыва"""
+
+    source: str  # drom.ru, drive2.ru
+    type: str  # review, board_journal
+    brand: str
+    model: str
+    generation: Optional[str] = None
+    year: Optional[int] = None
+    url: str = ""
+    title: str = ""
+    content: str = ""
+    author: str = ""
+    rating: Optional[float] = None
+    pros: str = ""
+    cons: str = ""
+    mileage: Optional[int] = None
+    engine_volume: Optional[float] = None
+    fuel_type: str = ""
+    transmission: str = ""
+    body_type: str = ""
+    drive_type: str = ""
+    publish_date: Optional[datetime] = None
+    views_count: Optional[int] = None
+    likes_count: Optional[int] = None
+    comments_count: Optional[int] = None
+    parsed_at: datetime = None
+    content_hash: str = ""
+
+    def __post_init__(self):
+        if self.parsed_at is None:
+            self.parsed_at = datetime.now()
+        content_for_hash = (
+            f"{self.url}_{self.title}_{self.content[:100] if self.content else ''}"
+        )
+        self.content_hash = hashlib.md5(content_for_hash.encode()).hexdigest()
 
 # ==================== БАЗА ДАННЫХ ====================
 
@@ -313,9 +354,14 @@ class AutoReviewsParser:
         self.setup_logging()
         self.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
+        # Менеджер задержек используется всеми парсерами и сервисами
+        self.delay_manager = DelayManager(
+            Config.MIN_DELAY, Config.MAX_DELAY, Config.ERROR_DELAY
+        )
+
         # Инициализация парсеров
-        self.drom_parser = DromParser(self.db)
-        self.drive2_parser = Drive2Parser(self.db)
+        self.drom_parser = DromParser(self.db, self.delay_manager)
+        self.drive2_parser = Drive2Parser(self.db, self.delay_manager)
 
     def setup_logging(self):
         """Настройка логирования"""
@@ -420,37 +466,43 @@ class AutoReviewsParser:
         conn.commit()
         conn.close()
 
-    def parse_single_source(self, brand: str, model: str, source: str) -> int:
+    def parse_single_source(self, brand: str, model: str, source: str):
         """Парсинг одного источника"""
         print(f"\n🎯 Парсинг: {brand} {model} на {source}")
 
-        reviews = []
         data = {"brand": brand, "model": model, "max_pages": Config.PAGES_PER_SESSION}
 
         try:
             if source == "drom.ru":
-                # Вызываем метод с передачей экземпляра парсера через metadata
-                reviews = self.drom_parser.parse_brand_model_reviews(
-                    data, metadata=self.drom_parser
-                )
+                reviews = self.drom_parser.parse_brand_model_reviews(data)
             elif source == "drive2.ru":
-                # Вызываем метод с правильной сигнатурой
                 reviews = self.drive2_parser.parse_brand_model_reviews(data)
-            if reviews is None:
+            else:
+                reviews = []
+
+            if not reviews:
                 logging.warning(
                     f"Parser returned no reviews for {brand} {model} on {source}"
                 )
-                reviews = []
+                return []
 
-            # Сохраняем отзывы в базу
+            dm = getattr(
+                self,
+                "delay_manager",
+                DelayManager(Config.MIN_DELAY, Config.MAX_DELAY, Config.ERROR_DELAY),
+            )
+
+            @retry_async(retries=Config.MAX_RETRIES, delay_manager=dm)
+            async def save(review):
+                return self.db.save_review(review)
+
             saved_count = 0
             for review in reviews:
-                if self.db.save_review(review):
+                if asyncio.run(save(review)):
                     saved_count += 1
 
             print(f"  💾 Сохранено {saved_count} из {len(reviews)} отзывов")
 
-            # Отмечаем источник как завершенный
             self.mark_source_completed(
                 brand, model, source, Config.PAGES_PER_SESSION, saved_count
             )
@@ -458,8 +510,10 @@ class AutoReviewsParser:
             return saved_count
 
         except Exception as e:
-            logging.error(f"Критическая ошибка парсинга {brand} {model} {source}: {e}")
-            return 0
+            logging.error(
+                f"Критическая ошибка парсинга {brand} {model} {source}: {e}"
+            )
+            return []
 
     def run_parsing_session(
         self, max_sources: int = 10, session_duration_hours: int = 2
@@ -504,7 +558,8 @@ class AutoReviewsParser:
 
                 # Пауза между источниками
                 if sources_processed < max_sources:
-                    delay = random.uniform(30, 60)  # 30-60 секунд между источниками
+                    inter_delay = DelayManager(30, 60, self.delay_manager.error_delay)
+                    delay = inter_delay._random_delay()
                     print(f"  ⏳ Пауза {delay:.1f} сек...")
                     time.sleep(delay)
 
@@ -515,7 +570,7 @@ class AutoReviewsParser:
                 sources_processed += 1
 
                 # Увеличенная пауза при ошибке
-                time.sleep(Config.ERROR_DELAY)
+                self.delay_manager.sleep_error()
 
         # Статистика сессии
         session_duration = datetime.now() - session_start
@@ -574,7 +629,7 @@ class AutoReviewsParser:
                 logging.error(f"Критическая ошибка в непрерывном парсинге: {e}")
                 print(f"❌ Критическая ошибка: {e}")
                 print("⏳ Пауза 30 минут перед повтором...")
-                time.sleep(1800)  # 30 минут пауза при критической ошибке
+                DelayManager(0, 0, 1800).sleep_error()
 
 
 # ==================== УТИЛИТЫ УПРАВЛЕНИЯ ====================
