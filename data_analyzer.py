@@ -3,7 +3,6 @@
 Утилиты для анализа собранных данных отзывов
 """
 
-import sqlite3
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -14,74 +13,85 @@ from typing import Dict, List, Tuple
 from pathlib import Path
 import json
 
+<<<<<<< HEAD
 from src.utils.logger import get_logger
 from src.utils.validators import validate_non_empty_string
 
 logger = get_logger(__name__)
+=======
+from src.database.base import Database
+>>>>>>> origin/codex/create-database-abstraction-and-repositories
 
 
 class ReviewsAnalyzer:
     """Анализатор собранных отзывов"""
 
     def __init__(self, db_path: str = "auto_reviews.db"):
+<<<<<<< HEAD
         self.db_path = validate_non_empty_string(db_path, "db_path")
+=======
+        self.db = Database(db_path)
+>>>>>>> origin/codex/create-database-abstraction-and-repositories
         self.ensure_db_exists()
 
     def ensure_db_exists(self):
         """Проверка существования базы данных"""
-        if not Path(self.db_path).exists():
-            raise FileNotFoundError(f"База данных не найдена: {self.db_path}")
+        if not Path(self.db.path).exists():
+            raise FileNotFoundError(f"База данных не найдена: {self.db.path}")
 
     def get_basic_stats(self) -> Dict:
         """Базовая статистика по собранным данным"""
-        conn = sqlite3.connect(self.db_path)
+        with self.db.connection() as conn:
+            stats = {}
 
-        stats = {}
+            # Общее количество
+            stats["total_reviews"] = pd.read_sql_query(
+                "SELECT COUNT(*) as count FROM reviews", conn
+            ).iloc[0]["count"]
 
-        # Общее количество
-        stats["total_reviews"] = pd.read_sql_query(
-            "SELECT COUNT(*) as count FROM reviews", conn
-        ).iloc[0]["count"]
-
-        # По источникам
-        stats["by_source"] = (
-            pd.read_sql_query(
-                "SELECT source, COUNT(*) as count FROM reviews GROUP BY source", conn
+            # По источникам
+            stats["by_source"] = (
+                pd.read_sql_query(
+                    "SELECT source, COUNT(*) as count FROM reviews GROUP BY source",
+                    conn,
+                )
+                .set_index("source")["count"]
+                .to_dict()
             )
-            .set_index("source")["count"]
-            .to_dict()
-        )
 
-        # По типам
-        stats["by_type"] = (
-            pd.read_sql_query(
-                "SELECT type, COUNT(*) as count FROM reviews GROUP BY type", conn
+            # По типам
+            stats["by_type"] = (
+                pd.read_sql_query(
+                    "SELECT type, COUNT(*) as count FROM reviews GROUP BY type",
+                    conn,
+                )
+                .set_index("type")["count"]
+                .to_dict()
             )
-            .set_index("type")["count"]
-            .to_dict()
-        )
 
-        # По брендам (топ 10)
-        stats["top_brands"] = (
-            pd.read_sql_query(
-                """SELECT brand, COUNT(*) as count FROM reviews 
+            # По брендам (топ 10)
+            stats["top_brands"] = (
+                pd.read_sql_query(
+                    """SELECT brand, COUNT(*) as count FROM reviews
                GROUP BY brand ORDER BY count DESC LIMIT 10""",
-                conn,
+                    conn,
+                )
+                .set_index("brand")["count"]
+                .to_dict()
             )
-            .set_index("brand")["count"]
-            .to_dict()
-        )
 
-        # По моделям (топ 15)
-        stats["top_models"] = (
-            pd.read_sql_query(
-                """SELECT brand || ' ' || model as model, COUNT(*) as count 
+            # По моделям (топ 15)
+            stats["top_models"] = (
+                pd.read_sql_query(
+                    """SELECT brand || ' ' || model as model, COUNT(*) as count
                FROM reviews GROUP BY brand, model ORDER BY count DESC LIMIT 15""",
-                conn,
+                    conn,
+                )
+                .set_index("model")["count"]
+                .to_dict()
             )
-            .set_index("model")["count"]
-            .to_dict()
-        )
+
+        return stats
 
         # Временная статистика
         stats["parsing_timeline"] = pd.read_sql_query(
@@ -99,7 +109,6 @@ class ReviewsAnalyzer:
             conn,
         )
 
-        conn.close()
         return stats
 
     def generate_report(self, output_dir: str = "analysis_reports") -> str:
@@ -386,58 +395,55 @@ class ReviewsAnalyzer:
 
     def get_brand_analysis(self, brand: str) -> Dict:
         """Детальный анализ конкретного бренда"""
-        conn = sqlite3.connect(self.db_path)
-
         analysis = {}
+        with self.db.connection() as conn:
+            # Основная статистика
+            analysis["total_reviews"] = pd.read_sql_query(
+                "SELECT COUNT(*) as count FROM reviews WHERE brand = ?",
+                conn,
+                params=[brand],
+            ).iloc[0]["count"]
 
-        # Основная статистика
-        analysis["total_reviews"] = pd.read_sql_query(
-            "SELECT COUNT(*) as count FROM reviews WHERE brand = ?",
-            conn,
-            params=[brand],
-        ).iloc[0]["count"]
-
-        # По моделям
-        analysis["models"] = pd.read_sql_query(
-            """SELECT model, COUNT(*) as count, AVG(rating) as avg_rating
-               FROM reviews WHERE brand = ? 
+            # По моделям
+            analysis["models"] = pd.read_sql_query(
+                """SELECT model, COUNT(*) as count, AVG(rating) as avg_rating
+               FROM reviews WHERE brand = ?
                GROUP BY model ORDER BY count DESC""",
-            conn,
-            params=[brand],
-        )
-
-        # Средний рейтинг
-        analysis["avg_rating"] = pd.read_sql_query(
-            "SELECT AVG(rating) as avg_rating FROM reviews WHERE brand = ? AND rating IS NOT NULL",
-            conn,
-            params=[brand],
-        ).iloc[0]["avg_rating"]
-
-        # Распределение по годам
-        analysis["by_year"] = pd.read_sql_query(
-            """SELECT year, COUNT(*) as count FROM reviews 
-               WHERE brand = ? AND year IS NOT NULL 
-               GROUP BY year ORDER BY year""",
-            conn,
-            params=[brand],
-        )
-
-        # Частые проблемы (анализ текста)
-        reviews_text = pd.read_sql_query(
-            "SELECT content, cons FROM reviews WHERE brand = ? AND (content != '' OR cons != '')",
-            conn,
-            params=[brand],
-        )
-
-        if not reviews_text.empty:
-            all_text = " ".join(
-                reviews_text["content"].fillna("")
-                + " "
-                + reviews_text["cons"].fillna("")
+                conn,
+                params=[brand],
             )
-            analysis["common_issues"] = self._extract_common_issues(all_text)
 
-        conn.close()
+            # Средний рейтинг
+            analysis["avg_rating"] = pd.read_sql_query(
+                "SELECT AVG(rating) as avg_rating FROM reviews WHERE brand = ? AND rating IS NOT NULL",
+                conn,
+                params=[brand],
+            ).iloc[0]["avg_rating"]
+
+            # Распределение по годам
+            analysis["by_year"] = pd.read_sql_query(
+                """SELECT year, COUNT(*) as count FROM reviews
+               WHERE brand = ? AND year IS NOT NULL
+               GROUP BY year ORDER BY year""",
+                conn,
+                params=[brand],
+            )
+
+            # Частые проблемы (анализ текста)
+            reviews_text = pd.read_sql_query(
+                "SELECT content, cons FROM reviews WHERE brand = ? AND (content != '' OR cons != '')",
+                conn,
+                params=[brand],
+            )
+
+            if not reviews_text.empty:
+                all_text = " ".join(
+                    reviews_text["content"].fillna("")
+                    + " "
+                    + reviews_text["cons"].fillna("")
+                )
+                analysis["common_issues"] = self._extract_common_issues(all_text)
+
         return analysis
 
     def _extract_common_issues(self, text: str) -> List[Tuple[str, int]]:
@@ -506,9 +512,6 @@ class ReviewsAnalyzer:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             output_file = f"analytics_export_{timestamp}.json"
 
-        conn = sqlite3.connect(self.db_path)
-
-        # Собираем все аналитические данные
         analytics = {
             "export_timestamp": datetime.now().isoformat(),
             "basic_stats": self.get_basic_stats(),
@@ -517,57 +520,56 @@ class ReviewsAnalyzer:
             "technical_stats": {},
         }
 
-        # Рейтинги брендов
-        brand_ratings = pd.read_sql_query(
-            """SELECT brand, AVG(rating) as avg_rating, COUNT(*) as review_count
-               FROM reviews WHERE rating IS NOT NULL 
+        with self.db.connection() as conn:
+            # Рейтинги брендов
+            brand_ratings = pd.read_sql_query(
+                """SELECT brand, AVG(rating) as avg_rating, COUNT(*) as review_count
+               FROM reviews WHERE rating IS NOT NULL
                GROUP BY brand ORDER BY avg_rating DESC""",
-            conn,
-        )
+                conn,
+            )
 
-        for _, row in brand_ratings.iterrows():
-            analytics["brand_ratings"][row["brand"]] = {
-                "avg_rating": round(row["avg_rating"], 2),
-                "review_count": int(row["review_count"]),
-            }
+            for _, row in brand_ratings.iterrows():
+                analytics["brand_ratings"][row["brand"]] = {
+                    "avg_rating": round(row["avg_rating"], 2),
+                    "review_count": int(row["review_count"]),
+                }
 
-        # Популярность моделей
-        model_popularity = pd.read_sql_query(
-            """SELECT brand, model, COUNT(*) as review_count, AVG(rating) as avg_rating
-               FROM reviews GROUP BY brand, model 
+            # Популярность моделей
+            model_popularity = pd.read_sql_query(
+                """SELECT brand, model, COUNT(*) as review_count, AVG(rating) as avg_rating
+               FROM reviews GROUP BY brand, model
                ORDER BY review_count DESC LIMIT 50""",
-            conn,
-        )
+                conn,
+            )
 
-        for _, row in model_popularity.iterrows():
-            key = f"{row['brand']} {row['model']}"
-            analytics["model_popularity"][key] = {
-                "review_count": int(row["review_count"]),
-                "avg_rating": round(row["avg_rating"] or 0, 2),
-            }
+            for _, row in model_popularity.iterrows():
+                key = f"{row['brand']} {row['model']}"
+                analytics["model_popularity"][key] = {
+                    "review_count": int(row["review_count"]),
+                    "avg_rating": round(row["avg_rating"] or 0, 2),
+                }
 
-        # Технические характеристики
-        tech_stats = pd.read_sql_query(
-            """SELECT 
+            # Технические характеристики
+            tech_stats = pd.read_sql_query(
+                """SELECT
                 fuel_type, COUNT(*) as count,
-                transmission, 
+                transmission,
                 AVG(engine_volume) as avg_engine,
                 AVG(mileage) as avg_mileage
-               FROM reviews 
+               FROM reviews
                WHERE fuel_type IS NOT NULL OR transmission IS NOT NULL
                GROUP BY fuel_type, transmission""",
-            conn,
-        )
+                conn,
+            )
 
-        for _, row in tech_stats.iterrows():
-            key = f"{row['fuel_type'] or 'unknown'}_{row['transmission'] or 'unknown'}"
-            analytics["technical_stats"][key] = {
-                "count": int(row["count"]),
-                "avg_engine": round(row["avg_engine"] or 0, 1),
-                "avg_mileage": int(row["avg_mileage"] or 0),
-            }
-
-        conn.close()
+            for _, row in tech_stats.iterrows():
+                key = f"{row['fuel_type'] or 'unknown'}_{row['transmission'] or 'unknown'}"
+                analytics["technical_stats"][key] = {
+                    "count": int(row["count"]),
+                    "avg_engine": round(row["avg_engine"] or 0, 1),
+                    "avg_mileage": int(row["avg_mileage"] or 0),
+                }
 
         # Сохраняем в JSON
         with open(output_file, "w", encoding="utf-8") as f:
@@ -578,92 +580,89 @@ class ReviewsAnalyzer:
 
     def get_recommendations(self) -> Dict:
         """Рекомендации на основе анализа отзывов"""
-        conn = sqlite3.connect(self.db_path)
-
         recommendations = {}
-
-        # Самые надежные модели (высокий рейтинг + много отзывов)
-        reliable_models = pd.read_sql_query(
-            """SELECT brand, model, AVG(rating) as avg_rating, COUNT(*) as review_count
-               FROM reviews WHERE rating IS NOT NULL 
-               GROUP BY brand, model 
+        with self.db.connection() as conn:
+            # Самые надежные модели (высокий рейтинг + много отзывов)
+            reliable_models = pd.read_sql_query(
+                """SELECT brand, model, AVG(rating) as avg_rating, COUNT(*) as review_count
+               FROM reviews WHERE rating IS NOT NULL
+               GROUP BY brand, model
                HAVING review_count >= 10 AND avg_rating >= 4.0
                ORDER BY avg_rating DESC, review_count DESC
                LIMIT 10""",
-            conn,
-        )
-
-        recommendations["most_reliable"] = []
-        for _, row in reliable_models.iterrows():
-            recommendations["most_reliable"].append(
-                {
-                    "model": f"{row['brand']} {row['model']}",
-                    "rating": round(row["avg_rating"], 2),
-                    "reviews": int(row["review_count"]),
-                }
+                conn,
             )
 
-        # Модели с наибольшим количеством отзывов (популярные)
-        popular_models = pd.read_sql_query(
-            """SELECT brand, model, COUNT(*) as review_count, AVG(rating) as avg_rating
-               FROM reviews GROUP BY brand, model 
-               ORDER BY review_count DESC 
+            recommendations["most_reliable"] = []
+            for _, row in reliable_models.iterrows():
+                recommendations["most_reliable"].append(
+                    {
+                        "model": f"{row['brand']} {row['model']}",
+                        "rating": round(row["avg_rating"], 2),
+                        "reviews": int(row["review_count"]),
+                    }
+                )
+
+            # Модели с наибольшим количеством отзывов (популярные)
+            popular_models = pd.read_sql_query(
+                """SELECT brand, model, COUNT(*) as review_count, AVG(rating) as avg_rating
+               FROM reviews GROUP BY brand, model
+               ORDER BY review_count DESC
                LIMIT 10""",
-            conn,
-        )
-
-        recommendations["most_popular"] = []
-        for _, row in popular_models.iterrows():
-            recommendations["most_popular"].append(
-                {
-                    "model": f"{row['brand']} {row['model']}",
-                    "reviews": int(row["review_count"]),
-                    "rating": round(row["avg_rating"] or 0, 2),
-                }
+                conn,
             )
 
-        # Бренды с лучшими рейтингами
-        top_brands = pd.read_sql_query(
-            """SELECT brand, AVG(rating) as avg_rating, COUNT(*) as review_count
-               FROM reviews WHERE rating IS NOT NULL 
+            recommendations["most_popular"] = []
+            for _, row in popular_models.iterrows():
+                recommendations["most_popular"].append(
+                    {
+                        "model": f"{row['brand']} {row['model']}",
+                        "reviews": int(row["review_count"]),
+                        "rating": round(row["avg_rating"] or 0, 2),
+                    }
+                )
+
+            # Бренды с лучшими рейтингами
+            top_brands = pd.read_sql_query(
+                """SELECT brand, AVG(rating) as avg_rating, COUNT(*) as review_count
+               FROM reviews WHERE rating IS NOT NULL
                GROUP BY brand HAVING review_count >= 20
-               ORDER BY avg_rating DESC 
+               ORDER BY avg_rating DESC
                LIMIT 5""",
-            conn,
-        )
-
-        recommendations["top_brands"] = []
-        for _, row in top_brands.iterrows():
-            recommendations["top_brands"].append(
-                {
-                    "brand": row["brand"],
-                    "rating": round(row["avg_rating"], 2),
-                    "reviews": int(row["review_count"]),
-                }
+                conn,
             )
 
-        # Модели с низкими рейтингами (избегать)
-        avoid_models = pd.read_sql_query(
-            """SELECT brand, model, AVG(rating) as avg_rating, COUNT(*) as review_count
-               FROM reviews WHERE rating IS NOT NULL 
-               GROUP BY brand, model 
+            recommendations["top_brands"] = []
+            for _, row in top_brands.iterrows():
+                recommendations["top_brands"].append(
+                    {
+                        "brand": row["brand"],
+                        "rating": round(row["avg_rating"], 2),
+                        "reviews": int(row["review_count"]),
+                    }
+                )
+
+            # Модели с низкими рейтингами (избегать)
+            avoid_models = pd.read_sql_query(
+                """SELECT brand, model, AVG(rating) as avg_rating, COUNT(*) as review_count
+               FROM reviews WHERE rating IS NOT NULL
+               GROUP BY brand, model
                HAVING review_count >= 5 AND avg_rating <= 2.5
-               ORDER BY avg_rating ASC 
+               ORDER BY avg_rating ASC
                LIMIT 5""",
-            conn,
-        )
-
-        recommendations["to_avoid"] = []
-        for _, row in avoid_models.iterrows():
-            recommendations["to_avoid"].append(
-                {
-                    "model": f"{row['brand']} {row['model']}",
-                    "rating": round(row["avg_rating"], 2),
-                    "reviews": int(row["review_count"]),
-                }
+                conn,
             )
 
-        conn.close()
+            recommendations["to_avoid"] = []
+            for _, row in avoid_models.iterrows():
+                recommendations["to_avoid"].append(
+                    {
+                        "model": f"{row['brand']} {row['model']}",
+                        "rating": round(row["avg_rating"], 2),
+                        "reviews": int(row["review_count"]),
+                    }
+                )
+
         return recommendations
 
 

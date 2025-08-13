@@ -5,7 +5,6 @@
 Работает в щадящем режиме для долгосрочного сбора данных
 """
 
-import sqlite3
 import time
 import random
 from datetime import datetime, timedelta
@@ -24,7 +23,13 @@ from botasaurus.request import request, Request
 from botasaurus.soupify import soupify
 from botasaurus import bt
 
+<<<<<<< HEAD
 logger = get_logger(__name__)
+=======
+from src.database.base import Database
+from src.database.repositories.review_repository import ReviewRepository
+from src.database.repositories.queue_repository import QueueRepository
+>>>>>>> origin/codex/create-database-abstraction-and-repositories
 
 # ==================== НАСТРОЙКИ ====================
 
@@ -119,6 +124,7 @@ class ReviewData:
         )
         self.content_hash = hashlib.md5(content_for_hash.encode()).hexdigest()
 
+<<<<<<< HEAD
 # ==================== БАЗА ДАННЫХ ====================
 
 
@@ -339,6 +345,8 @@ class ReviewsDatabase:
             "by_type": by_type,
         }
 
+=======
+>>>>>>> origin/codex/create-database-abstraction-and-repositories
 
 # ==================== ПАРСЕРЫ ====================
 
@@ -353,37 +361,24 @@ class AutoReviewsParser:
     """Главный класс парсера отзывов автомобилей"""
 
     def __init__(self, db_path: str = Config.DB_PATH):
+<<<<<<< HEAD
         validate_non_empty_string(db_path, "db_path")
         self.db = ReviewsDatabase(db_path)
+=======
+        self.db = Database(db_path)
+        self.review_repo = ReviewRepository(self.db)
+        self.queue_repo = QueueRepository(self.db)
+        self.setup_logging()
+>>>>>>> origin/codex/create-database-abstraction-and-repositories
         self.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
         # Инициализация парсеров
-        self.drom_parser = DromParser(self.db)
-        self.drive2_parser = Drive2Parser(self.db)
+        self.drom_parser = DromParser(self.review_repo)
+        self.drive2_parser = Drive2Parser(self.review_repo)
 
     def initialize_sources_queue(self):
         """Инициализация очереди источников для парсинга"""
-        conn = sqlite3.connect(self.db.db_path)
-        cursor = conn.cursor()
-
-        # Очищаем старую очередь
-        cursor.execute("DELETE FROM sources_queue")
-
-        # Добавляем все комбинации брендов и моделей
-        for brand, models in Config.TARGET_BRANDS.items():
-            for model in models:
-                for source in ["drom.ru", "drive2.ru"]:
-                    cursor.execute(
-                        """
-                        INSERT INTO sources_queue (brand, model, source, priority)
-                        VALUES (?, ?, ?, ?)
-                    """,
-                        (brand, model, source, 1),
-                    )
-
-        conn.commit()
-        conn.close()
-
+        self.queue_repo.initialize(Config.TARGET_BRANDS)
         total_sources = (
             len(Config.TARGET_BRANDS)
             * sum(len(models) for models in Config.TARGET_BRANDS.values())
@@ -393,60 +388,15 @@ class AutoReviewsParser:
 
     def get_next_source(self) -> Optional[Tuple[str, str, str]]:
         """Получение следующего источника для парсинга"""
-        conn = sqlite3.connect(self.db.db_path)
-        cursor = conn.cursor()
-
-        # Ищем неспарсенные источники, сортируем по приоритету
-        cursor.execute(
-            """
-            SELECT id, brand, model, source FROM sources_queue 
-            WHERE status = 'pending' 
-            ORDER BY priority DESC, RANDOM()
-            LIMIT 1
-        """
-        )
-
-        result = cursor.fetchone()
-
-        if result:
-            source_id, brand, model, source = result
-
-            # Отмечаем как обрабатываемый
-            cursor.execute(
-                """
-                UPDATE sources_queue 
-                SET status = 'processing', last_parsed = CURRENT_TIMESTAMP 
-                WHERE id = ?
-            """,
-                (source_id,),
-            )
-
-            conn.commit()
-            conn.close()
-
-            return brand, model, source
-
-        conn.close()
-        return None
+        return self.queue_repo.get_next()
 
     def mark_source_completed(
         self, brand: str, model: str, source: str, pages_parsed: int, reviews_found: int
     ):
         """Отметка источника как завершенного"""
-        conn = sqlite3.connect(self.db.db_path)
-        cursor = conn.cursor()
-
-        cursor.execute(
-            """
-            UPDATE sources_queue 
-            SET status = 'completed', parsed_pages = ?, total_pages = ?
-            WHERE brand = ? AND model = ? AND source = ?
-        """,
-            (pages_parsed, pages_parsed, brand, model, source),
+        self.queue_repo.mark_completed(
+            brand, model, source, pages_parsed, reviews_found
         )
-
-        conn.commit()
-        conn.close()
 
     def parse_single_source(self, brand: str, model: str, source: str) -> int:
         """Парсинг одного источника"""
@@ -471,7 +421,7 @@ class AutoReviewsParser:
             # Сохраняем отзывы в базу
             saved_count = 0
             for review in reviews:
-                if self.db.save_review(review):
+                if self.review_repo.save(review):
                     saved_count += 1
 
             print(f"  💾 Сохранено {saved_count} из {len(reviews)} отзывов")
@@ -514,7 +464,7 @@ class AutoReviewsParser:
             brand, model, source = source_info
 
             # Проверяем лимит отзывов для модели
-            current_count = self.db.get_reviews_count(brand, model)
+            current_count = self.review_repo.get_reviews_count(brand, model)
             if current_count >= Config.MAX_REVIEWS_PER_MODEL:
                 print(
                     f"  ⚠️ Лимит отзывов для {brand} {model} достигнут ({current_count})"
@@ -554,7 +504,7 @@ class AutoReviewsParser:
         print(f"{'='*60}")
 
         # Общая статистика базы
-        stats = self.db.get_parsing_stats()
+        stats = self.review_repo.get_parsing_stats()
         print(f"\n📈 ОБЩАЯ СТАТИСТИКА БАЗЫ ДАННЫХ")
         print(f"{'='*60}")
         print(f"Всего отзывов: {stats['total_reviews']}")
@@ -614,7 +564,7 @@ class ParserManager:
 
     def show_status(self):
         """Показать статус базы данных и очереди"""
-        stats = self.parser.db.get_parsing_stats()
+        stats = self.parser.review_repo.get_parsing_stats()
 
         print(f"\n📊 СТАТУС БАЗЫ ДАННЫХ")
         print(f"{'='*50}")
@@ -633,13 +583,7 @@ class ParserManager:
                 print(f"  {type_name}: {count:,}")
 
         # Статистика очереди
-        conn = sqlite3.connect(self.parser.db.db_path)
-        cursor = conn.cursor()
-
-        cursor.execute("SELECT status, COUNT(*) FROM sources_queue GROUP BY status")
-        queue_stats = dict(cursor.fetchall())
-
-        conn.close()
+        queue_stats = self.parser.queue_repo.get_stats()
 
         print(f"\n📋 СТАТУС ОЧЕРЕДИ")
         print(f"{'='*50}")
@@ -660,29 +604,23 @@ class ParserManager:
         """Экспорт данных из базы"""
         print(f"📤 Экспорт данных в формате {output_format}...")
 
-        conn = sqlite3.connect(self.parser.db.db_path)
-
-        # Получаем все отзывы
         query = """
-            SELECT 
+            SELECT
                 source, type, brand, model, year, title, author, rating,
                 content, pros, cons, mileage, engine_volume, fuel_type,
-                transmission, body_type, drive_type, publish_date, 
+                transmission, body_type, drive_type, publish_date,
                 views_count, likes_count, comments_count, url, parsed_at
             FROM reviews
             ORDER BY brand, model, parsed_at DESC
         """
 
         df_data = []
-        cursor = conn.cursor()
-        cursor.execute(query)
-
-        columns = [description[0] for description in cursor.description]
-
-        for row in cursor.fetchall():
-            df_data.append(dict(zip(columns, row)))
-
-        conn.close()
+        with self.parser.db.connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query)
+            columns = [description[0] for description in cursor.description]
+            for row in cursor.fetchall():
+                df_data.append(dict(zip(columns, row)))
 
         if not df_data:
             print("❌ Нет данных для экспорта")
