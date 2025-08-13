@@ -113,6 +113,7 @@ ERROR_COUNTER = _get_counter("parser_errors_total", "Errors during parsing")
 
 # ==================== МОДЕЛИ ДАННЫХ ====================
 
+<<<<<<< HEAD
 from dataclasses import dataclass
 <<<<<<< HEAD
 from typing import Optional
@@ -120,6 +121,9 @@ from typing import Optional
 from datetime import datetime
 from typing import Optional
 import hashlib
+=======
+from src.models.review import Review
+>>>>>>> origin/codex/create-review-model-and-update-parsers
 
 
 @dataclass
@@ -306,7 +310,7 @@ class ReviewsDatabase:
         conn.commit()
         conn.close()
 
-    def save_review(self, review: ReviewData) -> bool:
+    def save_review(self, review: Review) -> bool:
         """Сохранение отзыва в базу"""
         try:
             conn = sqlite3.connect(self.db_path)
@@ -505,6 +509,7 @@ class AutoReviewsParser:
         try:
             if source == "drom.ru":
 <<<<<<< HEAD
+<<<<<<< HEAD
                 reviews = self.drom_parser.parse_brand_model_reviews(data)
 =======
                 try:
@@ -518,6 +523,14 @@ class AutoReviewsParser:
                 reviews = self.drive2_parser.parse_brand_model_reviews(data)
             if reviews is None:
                 logger.warning(
+=======
+                reviews = self.drom_parser.parse_brand_model_reviews(data)
+            elif source == "drive2.ru":
+                reviews = self.drive2_parser.parse_brand_model_reviews(data)
+
+            if not reviews:
+                logging.warning(
+>>>>>>> origin/codex/create-review-model-and-update-parsers
                     f"Parser returned no reviews for {brand} {model} on {source}"
                 )
                 return False
@@ -552,7 +565,11 @@ class AutoReviewsParser:
                         brand, model, source, Config.PAGES_PER_SESSION, saved_count
                     )
 
+<<<<<<< HEAD
             return saved_count or False
+=======
+            return saved_count if saved_count > 0 else False
+>>>>>>> origin/codex/create-review-model-and-update-parsers
 
         except Exception as e:
 <<<<<<< HEAD
@@ -561,11 +578,15 @@ class AutoReviewsParser:
             ERROR_COUNTER.inc()
             logging.error(f"Критическая ошибка парсинга {brand} {model} {source}: {e}")
 <<<<<<< HEAD
+<<<<<<< HEAD
 >>>>>>> origin/codex/create-docker-folder-with-configuration-files
             return 0
 =======
             return False
 >>>>>>> origin/codex/create-parser_service-and-new-services
+=======
+            return False
+>>>>>>> origin/codex/create-review-model-and-update-parsers
 
     def run_parsing_session(
         self, max_sources: int = 10, session_duration_hours: int = 2

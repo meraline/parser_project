@@ -5,11 +5,15 @@ from urllib.parse import urljoin
 from botasaurus.browser import browser, Driver
 
 from .base_parser import BaseParser
+<<<<<<< HEAD
 from .models import ReviewData
 from src.utils.logger import get_logger
 from src.utils.validators import validate_non_empty_string
 
 logger = get_logger(__name__)
+=======
+from src.models.review import Review
+>>>>>>> origin/codex/create-review-model-and-update-parsers
 
 
 class DromParser(BaseParser):
@@ -22,13 +26,13 @@ class DromParser(BaseParser):
         max_retry=3,
         headless=True,
     )
-    def parse_brand_model_reviews(self, driver: Driver, data: Dict) -> List[ReviewData]:
+    def parse_brand_model_reviews(self, driver: Driver, data: Dict) -> List[Review]:
         """Парсинг отзывов для конкретной марки и модели"""
         brand = validate_non_empty_string(data["brand"], "brand")
         model = validate_non_empty_string(data["model"], "model")
         max_pages = data.get("max_pages", 50)
 
-        reviews: List[ReviewData] = []
+        reviews: List[Review] = []
         base_url = f"https://www.drom.ru/reviews/{brand}/{model}/"
 
         try:
@@ -88,10 +92,10 @@ class DromParser(BaseParser):
 
     def _parse_review_card(
         self, card, brand: str, model: str, base_url: str
-    ) -> Optional[ReviewData]:
+    ) -> Optional[Review]:
         """Парсинг одной карточки отзыва"""
         try:
-            review = ReviewData(
+            review = Review(
                 source="drom.ru", type="review", brand=brand, model=model
             )
 

@@ -1,4 +1,5 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 from parsers.drom_parser import DromParser
 from parsers.drive2_parser import Drive2Parser
 
@@ -14,3 +15,8 @@ if str(ROOT) not in sys.path:
 from parsers.drom_parser import DromParser
 from parsers.drive2_parser import Drive2Parser
 >>>>>>> origin/codex/create-parser_service-and-new-services
+=======
+from parsers import DromParser, Drive2Parser
+
+__all__ = ["DromParser", "Drive2Parser"]
+>>>>>>> origin/codex/create-review-model-and-update-parsers
