@@ -1,0 +1,48 @@
+# Auto Reviews Parser
+
+A parser for collecting car reviews and logs from **Drom.ru** and **Drive2.ru**. The project now ships with Docker setup, Prometheus metrics and optional Redis caching.
+
+## Quick start
+
+1. Create `.env` file (see `.env.example`).
+2. Install dependencies and run parser:
+
+```bash
+pip install -r requirements.txt
+python auto_reviews_parser.py init
+python auto_reviews_parser.py parse --sources 3
+```
+
+## Prometheus metrics
+
+The parser exposes metrics using [`prometheus-client`](https://github.com/prometheus/client_python). By default metrics are available on `http://localhost:${PROMETHEUS_PORT}`.
+
+## Docker
+
+Inside the `docker/` folder there is a ready to use `docker-compose.yml`:
+
+```bash
+cd docker
+docker-compose up --build
+```
+
+This starts the parser, Prometheus and Redis (for caching). Metrics are scraped automatically by Prometheus.
+
+## Packaging
+
+The project includes a minimal `setup.py` for packaging and distribution. Install in editable mode with:
+
+```bash
+pip install -e .
+```
+
+## Running tests
+
+```bash
+pytest
+```
+
+## License
+
+MIT
+

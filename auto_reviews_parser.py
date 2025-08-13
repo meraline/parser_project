@@ -14,6 +14,15 @@ import json
 from urllib.parse import urljoin, urlparse
 import hashlib
 from pathlib import Path
+import os
+
+from dotenv import load_dotenv
+from prometheus_client import Counter, start_http_server, REGISTRY
+
+try:
+    import redis
+except ImportError:  # pragma: no cover - redis is optional
+    redis = None
 
 from src.utils.logger import get_logger
 from src.utils.validators import validate_non_empty_string
@@ -24,12 +33,17 @@ from botasaurus.soupify import soupify
 from botasaurus import bt
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 logger = get_logger(__name__)
 =======
 from src.database.base import Database
 from src.database.repositories.review_repository import ReviewRepository
 from src.database.repositories.queue_repository import QueueRepository
 >>>>>>> origin/codex/create-database-abstraction-and-repositories
+=======
+# Load environment variables
+load_dotenv()
+>>>>>>> origin/codex/create-docker-folder-with-configuration-files
 
 # ==================== НАСТРОЙКИ ====================
 
@@ -38,7 +52,7 @@ class Config:
     """Конфигурация парсера"""
 
     # База данных
-    DB_PATH = "auto_reviews.db"
+    DB_PATH = os.getenv("DB_PATH", "auto_reviews.db")
 
     # Задержки (в секундах)
     MIN_DELAY = 5  # Минимальная задержка между запросами
@@ -78,6 +92,23 @@ class Config:
         "audi": ["a3", "a4", "a6", "q3", "q5", "q7"],
         "lada": ["granta", "kalina", "priora", "vesta", "xray", "largus"],
     }
+
+
+# ==================== METRICS ====================
+
+PROMETHEUS_PORT = int(os.getenv("PROMETHEUS_PORT", 8000))
+
+
+def _get_counter(name: str, description: str) -> Counter:
+    try:
+        return Counter(name, description)
+    except ValueError:  # counter already exists (e.g. in tests)
+        return REGISTRY._names_to_collectors[name]
+
+
+SOURCE_COUNTER = _get_counter("sources_processed_total", "Sources processed")
+REVIEW_COUNTER = _get_counter("reviews_saved_total", "Reviews saved")
+ERROR_COUNTER = _get_counter("parser_errors_total", "Errors during parsing")
 
 
 # ==================== МОДЕЛИ ДАННЫХ ====================
@@ -372,6 +403,14 @@ class AutoReviewsParser:
 >>>>>>> origin/codex/create-database-abstraction-and-repositories
         self.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
+        # Optional Redis cache
+        self.redis = None
+        if redis and os.getenv("REDIS_URL"):
+            try:
+                self.redis = redis.from_url(os.getenv("REDIS_URL"))
+            except Exception:
+                self.redis = None
+
         # Инициализация парсеров
         self.drom_parser = DromParser(self.review_repo)
         self.drive2_parser = Drive2Parser(self.review_repo)
@@ -420,10 +459,21 @@ class AutoReviewsParser:
 
             # Сохраняем отзывы в базу
             saved_count = 0
+            redis_client = getattr(self, "redis", None)
             for review in reviews:
+<<<<<<< HEAD
                 if self.review_repo.save(review):
+=======
+                if redis_client and redis_client.sismember("processed_reviews", review.url):
+                    continue
+                if self.db.save_review(review):
+>>>>>>> origin/codex/create-docker-folder-with-configuration-files
                     saved_count += 1
+                    REVIEW_COUNTER.inc()
+                    if redis_client:
+                        redis_client.sadd("processed_reviews", review.url)
 
+            SOURCE_COUNTER.inc()
             print(f"  💾 Сохранено {saved_count} из {len(reviews)} отзывов")
 
             # Отмечаем источник как завершенный
@@ -434,7 +484,12 @@ class AutoReviewsParser:
             return saved_count
 
         except Exception as e:
+<<<<<<< HEAD
             logger.error(f"Критическая ошибка парсинга {brand} {model} {source}: {e}")
+=======
+            ERROR_COUNTER.inc()
+            logging.error(f"Критическая ошибка парсинга {brand} {model} {source}: {e}")
+>>>>>>> origin/codex/create-docker-folder-with-configuration-files
             return 0
 
     def run_parsing_session(
@@ -648,6 +703,9 @@ class ParserManager:
 def main():
     """Главная функция для запуска парсера"""
     import argparse
+
+    # Запускаем HTTP-сервер метрик
+    start_http_server(PROMETHEUS_PORT)
 
     parser = argparse.ArgumentParser(description="Парсер отзывов автомобилей")
     parser.add_argument(
