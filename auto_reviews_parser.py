@@ -7,6 +7,7 @@
 
 import time
 import random
+import asyncio
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 import re
@@ -14,6 +15,7 @@ import json
 from urllib.parse import urljoin, urlparse
 import hashlib
 from pathlib import Path
+<<<<<<< HEAD
 import os
 
 from dotenv import load_dotenv
@@ -26,6 +28,11 @@ except ImportError:  # pragma: no cover - redis is optional
 
 from src.utils.logger import get_logger
 from src.utils.validators import validate_non_empty_string
+=======
+from dataclasses import dataclass
+from src.utils.delay_manager import DelayManager
+from src.utils.retry_decorator import retry_async
+>>>>>>> origin/codex/implement-delay-manager-and-retry-decorator
 
 from botasaurus.browser import browser, Driver
 from botasaurus.request import request, Request
@@ -120,6 +127,7 @@ ERROR_COUNTER = _get_counter("parser_errors_total", "Errors during parsing")
 # ==================== МОДЕЛИ ДАННЫХ ====================
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 from dataclasses import dataclass
 <<<<<<< HEAD
 from typing import Optional
@@ -130,6 +138,46 @@ import hashlib
 =======
 from src.models.review import Review
 >>>>>>> origin/codex/create-review-model-and-update-parsers
+=======
+
+@dataclass
+class ReviewData:
+    """Структура данных отзыва"""
+
+    source: str  # drom.ru, drive2.ru
+    type: str  # review, board_journal
+    brand: str
+    model: str
+    generation: Optional[str] = None
+    year: Optional[int] = None
+    url: str = ""
+    title: str = ""
+    content: str = ""
+    author: str = ""
+    rating: Optional[float] = None
+    pros: str = ""
+    cons: str = ""
+    mileage: Optional[int] = None
+    engine_volume: Optional[float] = None
+    fuel_type: str = ""
+    transmission: str = ""
+    body_type: str = ""
+    drive_type: str = ""
+    publish_date: Optional[datetime] = None
+    views_count: Optional[int] = None
+    likes_count: Optional[int] = None
+    comments_count: Optional[int] = None
+    parsed_at: datetime = None
+    content_hash: str = ""
+
+    def __post_init__(self):
+        if self.parsed_at is None:
+            self.parsed_at = datetime.now()
+        content_for_hash = (
+            f"{self.url}_{self.title}_{self.content[:100] if self.content else ''}"
+        )
+        self.content_hash = hashlib.md5(content_for_hash.encode()).hexdigest()
+>>>>>>> origin/codex/implement-delay-manager-and-retry-decorator
 
 
 @dataclass
@@ -470,6 +518,7 @@ class AutoReviewsParser:
 >>>>>>> origin/codex/create-database-abstraction-and-repositories
         self.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
+<<<<<<< HEAD
         # Optional Redis cache
         self.redis = None
         if redis and os.getenv("REDIS_URL"):
@@ -481,6 +530,32 @@ class AutoReviewsParser:
         # Инициализация парсеров
         self.drom_parser = DromParser(self.review_repo)
         self.drive2_parser = Drive2Parser(self.review_repo)
+=======
+        # Менеджер задержек используется всеми парсерами и сервисами
+        self.delay_manager = DelayManager(
+            Config.MIN_DELAY, Config.MAX_DELAY, Config.ERROR_DELAY
+        )
+
+        # Инициализация парсеров
+        self.drom_parser = DromParser(self.db, self.delay_manager)
+        self.drive2_parser = Drive2Parser(self.db, self.delay_manager)
+
+    def setup_logging(self):
+        """Настройка логирования"""
+        log_dir = Path("logs")
+        log_dir.mkdir(exist_ok=True)
+
+        log_file = log_dir / f"parser_{datetime.now().strftime('%Y%m%d')}.log"
+
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s - %(levelname)s - %(message)s",
+            handlers=[
+                logging.FileHandler(log_file, encoding="utf-8"),
+                logging.StreamHandler(),
+            ],
+        )
+>>>>>>> origin/codex/implement-delay-manager-and-retry-decorator
 
 <<<<<<< HEAD
     def initialize_sources_queue(self):
@@ -531,12 +606,13 @@ class AutoReviewsParser:
 =======
 >>>>>>> origin/codex/create-parser_service-and-new-services
 
-    def parse_single_source(self, brand: str, model: str, source: str) -> int:
+    def parse_single_source(self, brand: str, model: str, source: str):
         """Парсинг одного источника"""
         brand = validate_non_empty_string(brand, "brand")
         model = validate_non_empty_string(model, "model")
         print(f"\n🎯 Парсинг: {brand} {model} на {source}")
 
+<<<<<<< HEAD
         reviews = []
         data = {"brand": brand, "model": model, "max_pages": settings.pages_per_session}
 
@@ -561,18 +637,43 @@ class AutoReviewsParser:
                 reviews = self.drom_parser.parse_brand_model_reviews(data)
             elif source == "drive2.ru":
                 reviews = self.drive2_parser.parse_brand_model_reviews(data)
+=======
+        data = {"brand": brand, "model": model, "max_pages": Config.PAGES_PER_SESSION}
+
+        try:
+            if source == "drom.ru":
+                reviews = self.drom_parser.parse_brand_model_reviews(data)
+            elif source == "drive2.ru":
+                reviews = self.drive2_parser.parse_brand_model_reviews(data)
+            else:
+                reviews = []
+>>>>>>> origin/codex/implement-delay-manager-and-retry-decorator
 
             if not reviews:
                 logging.warning(
 >>>>>>> origin/codex/create-review-model-and-update-parsers
                     f"Parser returned no reviews for {brand} {model} on {source}"
                 )
+<<<<<<< HEAD
                 return False
+=======
+                return []
 
-            # Сохраняем отзывы в базу
+            dm = getattr(
+                self,
+                "delay_manager",
+                DelayManager(Config.MIN_DELAY, Config.MAX_DELAY, Config.ERROR_DELAY),
+            )
+
+            @retry_async(retries=Config.MAX_RETRIES, delay_manager=dm)
+            async def save(review):
+                return self.db.save_review(review)
+>>>>>>> origin/codex/implement-delay-manager-and-retry-decorator
+
             saved_count = 0
             redis_client = getattr(self, "redis", None)
             for review in reviews:
+<<<<<<< HEAD
 <<<<<<< HEAD
                 if self.review_repo.save(review):
 =======
@@ -580,6 +681,9 @@ class AutoReviewsParser:
                     continue
                 if self.db.save_review(review):
 >>>>>>> origin/codex/create-docker-folder-with-configuration-files
+=======
+                if asyncio.run(save(review)):
+>>>>>>> origin/codex/implement-delay-manager-and-retry-decorator
                     saved_count += 1
                     REVIEW_COUNTER.inc()
                     if redis_client:
@@ -588,6 +692,7 @@ class AutoReviewsParser:
             SOURCE_COUNTER.inc()
             print(f"  💾 Сохранено {saved_count} из {len(reviews)} отзывов")
 
+<<<<<<< HEAD
 <<<<<<< HEAD
             # Отмечаем источник как завершенный только если есть сохраненные отзывы
             if saved_count:
@@ -601,6 +706,8 @@ class AutoReviewsParser:
                     )
 =======
             # Отмечаем источник как завершенный
+=======
+>>>>>>> origin/codex/implement-delay-manager-and-retry-decorator
             self.mark_source_completed(
                 brand, model, source, settings.pages_per_session, saved_count
             )
@@ -613,6 +720,7 @@ class AutoReviewsParser:
 >>>>>>> origin/codex/create-review-model-and-update-parsers
 
         except Exception as e:
+<<<<<<< HEAD
 <<<<<<< HEAD
             logger.error(f"Критическая ошибка парсинга {brand} {model} {source}: {e}")
 =======
@@ -628,6 +736,12 @@ class AutoReviewsParser:
 =======
             return False
 >>>>>>> origin/codex/create-review-model-and-update-parsers
+=======
+            logging.error(
+                f"Критическая ошибка парсинга {brand} {model} {source}: {e}"
+            )
+            return []
+>>>>>>> origin/codex/implement-delay-manager-and-retry-decorator
 
     def run_parsing_session(
         self, max_sources: int = 10, session_duration_hours: int = 2
@@ -677,7 +791,8 @@ class AutoReviewsParser:
 
                 # Пауза между источниками
                 if sources_processed < max_sources:
-                    delay = random.uniform(30, 60)  # 30-60 секунд между источниками
+                    inter_delay = DelayManager(30, 60, self.delay_manager.error_delay)
+                    delay = inter_delay._random_delay()
                     print(f"  ⏳ Пауза {delay:.1f} сек...")
                     time.sleep(delay)
 
@@ -688,7 +803,11 @@ class AutoReviewsParser:
                 sources_processed += 1
 
                 # Увеличенная пауза при ошибке
+<<<<<<< HEAD
                 time.sleep(settings.error_delay)
+=======
+                self.delay_manager.sleep_error()
+>>>>>>> origin/codex/implement-delay-manager-and-retry-decorator
 
         # Статистика сессии
         session_duration = datetime.now() - session_start
@@ -747,7 +866,7 @@ class AutoReviewsParser:
                 logger.error(f"Критическая ошибка в непрерывном парсинге: {e}")
                 print(f"❌ Критическая ошибка: {e}")
                 print("⏳ Пауза 30 минут перед повтором...")
-                time.sleep(1800)  # 30 минут пауза при критической ошибке
+                DelayManager(0, 0, 1800).sleep_error()
 
 
 # ==================== УТИЛИТЫ УПРАВЛЕНИЯ ====================

@@ -4,17 +4,28 @@ import re
 from datetime import datetime, timedelta
 from typing import Optional
 
+<<<<<<< HEAD
 from src.utils.logger import get_logger
 from src.utils.validators import validate_not_none
 
 logger = get_logger(__name__)
+=======
+from src.utils.delay_manager import DelayManager
+from src.utils.retry_decorator import retry_async
+>>>>>>> origin/codex/implement-delay-manager-and-retry-decorator
 
 
 class BaseParser:
     """Базовый парсер с общими утилитами"""
 
+<<<<<<< HEAD
     def __init__(self, db):
         self.db = validate_not_none(db, "db")
+=======
+    def __init__(self, db, delay_manager: DelayManager | None = None):
+        self.db = db
+        self.delay_manager = delay_manager or DelayManager()
+>>>>>>> origin/codex/implement-delay-manager-and-retry-decorator
         self.session_stats = {
             "parsed": 0,
             "saved": 0,
@@ -24,8 +35,14 @@ class BaseParser:
 
     def random_delay(self, min_delay: int = 5, max_delay: int = 15):
         """Случайная задержка между запросами"""
-        delay = random.uniform(min_delay, max_delay)
-        time.sleep(delay)
+        self.delay_manager.min_delay = min_delay
+        self.delay_manager.max_delay = max_delay
+        self.delay_manager.sleep()
+
+    @retry_async()
+    async def _run_with_retry(self, func, *args, **kwargs):
+        """Выполнение функции с повторными попытками"""
+        return func(*args, **kwargs)
 
     def normalize_text(self, text: str) -> str:
         """Нормализация текста"""
