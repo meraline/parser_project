@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from auto_reviews_parser import AutoReviewsParser, Config
+from auto_reviews_parser import AutoReviewsParser
+from config.settings import settings, TARGET_BRANDS
 
 from .queue_service import QueueService
 from .export_service import ExportService
@@ -9,8 +10,8 @@ from .export_service import ExportService
 class ParserService:
     """Сервис-оркестратор для работы парсеров"""
 
-    def __init__(self, db_path: str = Config.DB_PATH):
-        self.queue_service = QueueService(db_path, Config.TARGET_BRANDS)
+    def __init__(self, db_path: str = settings.db_path):
+        self.queue_service = QueueService(db_path, TARGET_BRANDS)
         self.export_service = ExportService(db_path)
         self.parser = AutoReviewsParser(db_path, queue_service=self.queue_service)
 
