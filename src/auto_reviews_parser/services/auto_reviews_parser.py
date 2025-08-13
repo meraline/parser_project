@@ -25,8 +25,6 @@ from .parallel_parser import ParallelParserService
 
 from ..utils.metrics import setup_metrics
 
-logger = logging.getLogger(__name__)
-
 # ==================== НАСТРОЙКИ ====================
 
 
