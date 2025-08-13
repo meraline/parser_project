@@ -371,9 +371,13 @@ class AutoReviewsParser:
         
         try:
             if source == 'drom.ru':
-                reviews = self.drom_parser.parse_brand_model_reviews(data)
+                reviews = self.drom_parser.parse_brand_model_reviews(
+                    data, metadata=self.drom_parser
+                )
             elif source == 'drive2.ru':
-                reviews = self.drive2_parser.parse_brand_model_reviews(data)
+                reviews = self.drive2_parser.parse_brand_model_reviews(
+                    data, metadata=self.drive2_parser
+                )
             
             # Сохраняем отзывы в базу
             saved_count = 0
@@ -637,4 +641,5 @@ def main():
         manager.export_data(output_format=args.format)
 
 if __name__ == "__main__":
+
     main()

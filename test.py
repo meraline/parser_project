@@ -298,7 +298,9 @@ class ReviewsDatabase:
 
 # ==================== ПАРСЕРЫ ====================
 
+
 from parsers import DromParser, Drive2Parser
+
 
 # ==================== ГЛАВНЫЙ ПАРСЕР ====================
 
@@ -427,11 +429,18 @@ class AutoReviewsParser:
 
         try:
             if source == "drom.ru":
-                # Вызываем метод с правильной сигнатурой
-                reviews = self.drom_parser.parse_brand_model_reviews(data)
+                # Вызываем метод с передачей экземпляра парсера через metadata
+                reviews = self.drom_parser.parse_brand_model_reviews(
+                    data, metadata=self.drom_parser
+                )
             elif source == "drive2.ru":
                 # Вызываем метод с правильной сигнатурой
                 reviews = self.drive2_parser.parse_brand_model_reviews(data)
+            if reviews is None:
+                logging.warning(
+                    f"Parser returned no reviews for {brand} {model} on {source}"
+                )
+                reviews = []
 
             # Сохраняем отзывы в базу
             saved_count = 0
