@@ -1,4 +1,3 @@
-import logging
 import re
 from typing import Dict, List, Optional
 from urllib.parse import urljoin
@@ -7,6 +6,10 @@ from botasaurus.browser import browser, Driver
 
 from .base_parser import BaseParser
 from .models import ReviewData
+from src.utils.logger import get_logger
+from src.utils.validators import validate_non_empty_string
+
+logger = get_logger(__name__)
 
 
 class Drive2Parser(BaseParser):
@@ -21,8 +24,8 @@ class Drive2Parser(BaseParser):
     )
     def parse_brand_model_reviews(self, driver: Driver, data: Dict) -> List[ReviewData]:
         """Парсинг отзывов для конкретной марки и модели"""
-        brand = data["brand"]
-        model = data["model"]
+        brand = validate_non_empty_string(data["brand"], "brand")
+        model = validate_non_empty_string(data["model"], "model")
         max_pages = data.get("max_pages", 50)
 
         reviews: List[ReviewData] = []
@@ -34,7 +37,7 @@ class Drive2Parser(BaseParser):
                 reviews.extend(type_reviews)
                 self.random_delay(5, 10)
             except Exception as e:
-                logging.error(
+                logger.error(
                     f"Ошибка парсинга {content_type} Drive2.ru {brand} {model}: {e}"
                 )
                 self.session_stats["errors"] += 1
@@ -86,7 +89,7 @@ class Drive2Parser(BaseParser):
                             page_reviews += 1
                     except Exception as e:
                         self.session_stats["errors"] += 1
-                        logging.error(f"Ошибка парсинга карточки Drive2: {e}")
+                        logger.error(f"Ошибка парсинга карточки Drive2: {e}")
 
                 print(f"    ✓ Найдено {page_reviews} новых записей")
 
@@ -107,7 +110,7 @@ class Drive2Parser(BaseParser):
                 else:
                     break
         except Exception as e:
-            logging.error(
+            logger.error(
                 f"Ошибка парсинга Drive2.ru {content_type} {brand} {model}: {e}"
             )
             self.session_stats["errors"] += 1
@@ -200,5 +203,5 @@ class Drive2Parser(BaseParser):
 
             return review if review.url else None
         except Exception as e:
-            logging.error(f"Ошибка парсинга карточки Drive2: {e}")
+            logger.error(f"Ошибка парсинга карточки Drive2: {e}")
             return None

@@ -1,4 +1,3 @@
-import logging
 import re
 from typing import Dict, List, Optional
 from urllib.parse import urljoin
@@ -7,6 +6,10 @@ from botasaurus.browser import browser, Driver
 
 from .base_parser import BaseParser
 from .models import ReviewData
+from src.utils.logger import get_logger
+from src.utils.validators import validate_non_empty_string
+
+logger = get_logger(__name__)
 
 
 class DromParser(BaseParser):
@@ -21,8 +24,8 @@ class DromParser(BaseParser):
     )
     def parse_brand_model_reviews(self, driver: Driver, data: Dict) -> List[ReviewData]:
         """Парсинг отзывов для конкретной марки и модели"""
-        brand = data["brand"]
-        model = data["model"]
+        brand = validate_non_empty_string(data["brand"], "brand")
+        model = validate_non_empty_string(data["model"], "model")
         max_pages = data.get("max_pages", 50)
 
         reviews: List[ReviewData] = []
@@ -57,7 +60,7 @@ class DromParser(BaseParser):
                             page_reviews += 1
                     except Exception as e:
                         self.session_stats["errors"] += 1
-                        logging.error(f"Ошибка парсинга карточки отзыва: {e}")
+                        logger.error(f"Ошибка парсинга карточки отзыва: {e}")
 
                 print(f"    ✓ Найдено {page_reviews} новых отзывов")
 
@@ -78,7 +81,7 @@ class DromParser(BaseParser):
 
             print(f"  ✓ Drom.ru: Собрано {len(reviews)} отзывов для {brand} {model}")
         except Exception as e:
-            logging.error(f"Ошибка парсинга Drom.ru {brand} {model}: {e}")
+            logger.error(f"Ошибка парсинга Drom.ru {brand} {model}: {e}")
             self.session_stats["errors"] += 1
 
         return reviews
@@ -148,5 +151,5 @@ class DromParser(BaseParser):
 
             return review if review.url else None
         except Exception as e:
-            logging.error(f"Ошибка парсинга карточки отзыва Drom: {e}")
+            logger.error(f"Ошибка парсинга карточки отзыва Drom: {e}")
             return None
