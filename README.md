@@ -13,6 +13,17 @@ python auto_reviews_parser.py init
 python auto_reviews_parser.py parse --sources 3
 ```
 
+
+## Health check
+
+To verify that the parser and database are reachable run the health check
+command. It returns a small JSON payload with overall status and a link to
+the Prometheus metrics endpoint.
+
+```bash
+python cli/main.py health
+```
+
 ## Environment variables
 
 The application reads configuration from environment variables (or a `.env` file). Key settings:
@@ -23,6 +34,7 @@ The application reads configuration from environment variables (or a `.env` file
 | `PROMETHEUS_PORT` | `8000` | Port where Prometheus metrics are exposed |
 | `REDIS_URL` | `redis://localhost:6379/0` | Redis connection URL |
 | `MAX_WORKERS` | `4` | Number of worker threads for parallel parsing |
+
 
 ## Prometheus metrics
 
