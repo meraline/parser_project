@@ -506,6 +506,7 @@ class BaseParser:
 class DromParser(BaseParser):
     """Парсер отзывов с Drom.ru"""
 
+    @staticmethod
     @browser(
         block_images=True,
         cache=False,
@@ -515,7 +516,7 @@ class DromParser(BaseParser):
         headless=True,
     )
 
-    def parse_brand_model_reviews(self, driver: Driver, data: Dict) -> List[ReviewData]:
+    def parse_brand_model_reviews(driver: Driver, data: Dict, parser) -> List[ReviewData]:
         """Парсинг отзывов для конкретной марки и модели"""
         brand = data["brand"]
         model = data["model"]
@@ -529,7 +530,7 @@ class DromParser(BaseParser):
 
             # Переходим на страницу отзывов
             driver.google_get(base_url, bypass_cloudflare=True)
-            self.random_delay(3, 7)
+            parser.random_delay(3, 7)
 
             # Проверяем, что страница загрузилась корректно
             if driver.select(".error-page") or "404" in driver.title:
@@ -555,13 +556,13 @@ class DromParser(BaseParser):
 
                 for card in review_cards:
                     try:
-                        review = self._parse_review_card(card, brand, model, base_url)
-                        if review and not self.db.is_url_parsed(review.url):
+                        review = parser._parse_review_card(card, brand, model, base_url)
+                        if review and not parser.db.is_url_parsed(review.url):
                             reviews.append(review)
                             page_reviews += 1
 
                     except Exception as e:
-                        self.session_stats["errors"] += 1
+                        parser.session_stats["errors"] += 1
                         logging.error(f"Ошибка парсинга карточки отзыва: {e}")
 
                 print(f"    ✓ Найдено {page_reviews} новых отзывов")
@@ -579,7 +580,7 @@ class DromParser(BaseParser):
                         next_url = urljoin(base_url, next_url)
 
                     driver.get_via_this_page(next_url)
-                    self.random_delay()
+                    parser.random_delay()
                     current_page += 1
                 else:
                     break
@@ -588,7 +589,7 @@ class DromParser(BaseParser):
 
         except Exception as e:
             logging.error(f"Ошибка парсинга Drom.ru {brand} {model}: {e}")
-            self.session_stats["errors"] += 1
+            parser.session_stats["errors"] += 1
 
         return reviews
 
@@ -677,6 +678,7 @@ class DromParser(BaseParser):
 class Drive2Parser(BaseParser):
     """Парсер отзывов и бортжурналов с Drive2.ru"""
 
+    @staticmethod
     @browser(
         block_images=True,
         cache=False,
@@ -685,7 +687,7 @@ class Drive2Parser(BaseParser):
         user_agent=random.choice(Config.USER_AGENTS),
         headless=True,
     )
-    def parse_brand_model_reviews(self, driver: Driver, data: Dict) -> List[ReviewData]:
+    def parse_brand_model_reviews(driver: Driver, data: Dict, parser) -> List[ReviewData]:
         """Парсинг отзывов для конкретной марки и модели"""
         brand = data["brand"]
         model = data["model"]
@@ -696,17 +698,17 @@ class Drive2Parser(BaseParser):
         # Парсим и отзывы, и бортжурналы
         for content_type in ["experience", "logbook"]:
             try:
-                type_reviews = self._parse_content_type(
+                type_reviews = parser._parse_content_type(
                     driver, brand, model, content_type, max_pages // 2
                 )
                 reviews.extend(type_reviews)
-                self.random_delay(5, 10)  # Пауза между типами контента
+                parser.random_delay(5, 10)  # Пауза между типами контента
 
             except Exception as e:
                 logging.error(
                     f"Ошибка парсинга {content_type} Drive2.ru {brand} {model}: {e}"
                 )
-                self.session_stats["errors"] += 1
+                parser.session_stats["errors"] += 1
 
         return reviews
 
@@ -1028,11 +1030,15 @@ class AutoReviewsParser:
 
         try:
             if source == "drom.ru":
-                # Вызываем метод с правильной сигнатурой
-                reviews = self.drom_parser.parse_brand_model_reviews(data)
+                # Вызываем метод с передачей экземпляра парсера через metadata
+                reviews = self.drom_parser.parse_brand_model_reviews(
+                    data, metadata=self.drom_parser
+                )
             elif source == "drive2.ru":
-                # Вызываем метод с правильной сигнатурой
-                reviews = self.drive2_parser.parse_brand_model_reviews(data)
+                # Вызываем метод с передачей экземпляра парсера через metadata
+                reviews = self.drive2_parser.parse_brand_model_reviews(
+                    data, metadata=self.drive2_parser
+                )
 
             # Сохраняем отзывы в базу
             saved_count = 0
