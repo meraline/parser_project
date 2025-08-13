@@ -495,14 +495,14 @@ class BaseParser:
         return None
 
 
-@browser(
-    block_images=True,
-    cache=True,
-    reuse_driver=True,
-    max_retry=3,
-    user_agent=random.choice(Config.USER_AGENTS),
-    headless=True,
-)
+# @browser(
+#     block_images=True,
+#     cache=True,
+#     reuse_driver=True,
+#     max_retry=3,
+#     user_agent=random.choice(Config.USER_AGENTS),
+#     headless=True,
+# )
 class DromParser(BaseParser):
     """Парсер отзывов с Drom.ru"""
 
