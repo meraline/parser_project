@@ -1,11 +1,17 @@
+import sys
 import hashlib
 from datetime import datetime
+from pathlib import Path
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
 from src.models import ReviewData
 
 
 def test_parsed_at_auto_set():
-    review = Review(
+    review = ReviewData(
         source="drom.ru",
         type="review",
         brand="toyota",
@@ -20,7 +26,7 @@ def test_content_hash_md5_known_values():
     url = "http://example.com/review1"
     title = "Great car"
     content = "a" * 150
-    review = Review(
+    review = ReviewData(
         source="drom.ru",
         type="review",
         brand="toyota",
