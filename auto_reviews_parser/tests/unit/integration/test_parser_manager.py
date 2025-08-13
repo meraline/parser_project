@@ -1,7 +1,7 @@
 import logging
 import pytest
 
-from auto_reviews_parser import AutoReviewsParser
+from services.auto_reviews_parser import AutoReviewsParser
 
 
 @pytest.mark.parametrize("source", ["drom.ru", "drive2.ru"])

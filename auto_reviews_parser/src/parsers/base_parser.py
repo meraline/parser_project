@@ -1,31 +1,24 @@
-import random
-import time
 import re
 from datetime import datetime, timedelta
 from typing import Optional
 
-<<<<<<< HEAD
+from src.database.base import Database
+from src.utils.delay_manager import DelayManager
 from src.utils.logger import get_logger
+from src.utils.retry_decorator import retry_async
 from src.utils.validators import validate_not_none
 
 logger = get_logger(__name__)
-=======
-from src.utils.delay_manager import DelayManager
-from src.utils.retry_decorator import retry_async
->>>>>>> origin/codex/implement-delay-manager-and-retry-decorator
 
 
 class BaseParser:
     """Базовый парсер с общими утилитами"""
 
-<<<<<<< HEAD
-    def __init__(self, db):
+    def __init__(
+        self, db: Database, delay_manager: DelayManager | None = None
+    ) -> None:
         self.db = validate_not_none(db, "db")
-=======
-    def __init__(self, db, delay_manager: DelayManager | None = None):
-        self.db = db
         self.delay_manager = delay_manager or DelayManager()
->>>>>>> origin/codex/implement-delay-manager-and-retry-decorator
         self.session_stats = {
             "parsed": 0,
             "saved": 0,
