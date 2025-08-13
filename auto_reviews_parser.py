@@ -368,30 +368,37 @@ class AutoReviewsParser:
             'model': model,
             'max_pages': Config.PAGES_PER_SESSION
         }
-        
+
         try:
             if source == 'drom.ru':
                 reviews = self.drom_parser.parse_brand_model_reviews(
                     data, metadata=self.drom_parser
                 )
             elif source == 'drive2.ru':
-                reviews = self.drive2_parser.parse_brand_model_reviews(
-                    data, metadata=self.drive2_parser
+
+                reviews = self.drive2_parser.parse_brand_model_reviews(data)
+
+            if reviews is None:
+                logging.warning(
+                    f"Парсер {source} вернул None для {brand} {model}"
                 )
-            
+                return False
+
             # Сохраняем отзывы в базу
             saved_count = 0
             for review in reviews:
                 if self.db.save_review(review):
                     saved_count += 1
-            
+
             print(f"  💾 Сохранено {saved_count} из {len(reviews)} отзывов")
-            
+
             # Отмечаем источник как завершенный
-            self.mark_source_completed(brand, model, source, Config.PAGES_PER_SESSION, saved_count)
-            
-            return saved_count
-            
+            self.mark_source_completed(
+                brand, model, source, Config.PAGES_PER_SESSION, saved_count
+            )
+
+            return saved_count if reviews else False
+
         except Exception as e:
             logging.error(f"Критическая ошибка парсинга {brand} {model} {source}: {e}")
             return 0
@@ -643,3 +650,4 @@ def main():
 if __name__ == "__main__":
 
     main()
+
