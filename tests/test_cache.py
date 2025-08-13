@@ -2,6 +2,7 @@ import json
 import sys
 from pathlib import Path
 import types
+import logging
 
 import fakeredis
 import redis
@@ -70,3 +71,29 @@ def test_parser_service_uses_cache(monkeypatch):
     data2 = service.get_status_data()
     assert calls["count"] == 1
     assert data1 == data2
+
+
+def test_parser_service_show_status_logs(monkeypatch, caplog):
+    monkeypatch.setattr(redis, "from_url", _fake_from_url)
+    cache = RedisCache("redis://localhost:6379/0")
+    service = ParserService(cache=cache)
+
+    def fake_get_status_data():
+        return {
+            "stats": {
+                "total_reviews": 1,
+                "unique_brands": 1,
+                "unique_models": 1,
+                "by_source": {"src": 1},
+                "by_type": {"type": 1},
+            },
+            "queue_stats": {"pending": 1},
+        }
+
+    monkeypatch.setattr(service, "get_status_data", fake_get_status_data)
+
+    with caplog.at_level(logging.INFO):
+        service.show_status()
+
+    assert "СТАТУС БАЗЫ ДАННЫХ" in caplog.text
+    assert "СТАТУС ОЧЕРЕДИ" in caplog.text

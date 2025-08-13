@@ -1,5 +1,9 @@
 import sqlite3
+import logging
 from typing import Dict, Optional, Tuple, List
+
+
+logger = logging.getLogger(__name__)
 
 
 class QueueService:
@@ -29,7 +33,7 @@ class QueueService:
         conn.close()
 
         total_sources = sum(len(models) for models in self.target_brands.values()) * 2
-        print(f"✅ Инициализирована очередь из {total_sources} источников")
+        logger.info(f"✅ Инициализирована очередь из {total_sources} источников")
 
     def get_next_source(self) -> Optional[Tuple[str, str, str]]:
         """Получение следующего источника для парсинга"""

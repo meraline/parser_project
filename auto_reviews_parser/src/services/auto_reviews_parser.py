@@ -25,6 +25,8 @@ from .parallel_parser import ParallelParserService
 
 from utils.metrics import setup_metrics
 
+logger = logging.getLogger(__name__)
+
 # ==================== НАСТРОЙКИ ====================
 
 
@@ -386,7 +388,7 @@ class AutoReviewsParser:
             * sum(len(models) for models in Config.TARGET_BRANDS.values())
             * 2
         )
-        print(f"✅ Инициализирована очередь из {total_sources} источников")
+        logger.info(f"✅ Инициализирована очередь из {total_sources} источников")
 
     def get_next_source(self) -> Optional[Tuple[str, str, str]]:
         """Получение следующего источника для парсинга"""
@@ -447,7 +449,7 @@ class AutoReviewsParser:
 
     def parse_single_source(self, brand: str, model: str, source: str) -> int:
         """Парсинг одного источника"""
-        print(f"\n🎯 Парсинг: {brand} {model} на {source}")
+        logger.info(f"\n🎯 Парсинг: {brand} {model} на {source}")
 
         data = {"brand": brand, "model": model, "max_pages": Config.PAGES_PER_SESSION}
 
@@ -473,7 +475,7 @@ class AutoReviewsParser:
                 if self.db.save_review(review):
                     saved_count += 1
 
-            print(f"  💾 Сохранено {saved_count} из {len(reviews)} отзывов")
+            logger.info(f"  💾 Сохранено {saved_count} из {len(reviews)} отзывов")
 
             # Отмечаем источник как завершенный
             self.mark_source_completed(
@@ -538,11 +540,11 @@ class AutoReviewsParser:
         self, max_sources: int = 10, session_duration_hours: int = 2
     ):
         """Запуск сессии парсинга"""
-        print(f"\n🚀 ЗАПУСК СЕССИИ ПАРСИНГА")
-        print(f"{'='*60}")
-        print(f"Максимум источников за сессию: {max_sources}")
-        print(f"Максимальная длительность: {session_duration_hours} часов")
-        print(f"{'='*60}")
+        logger.info(f"\n🚀 ЗАПУСК СЕССИИ ПАРСИНГА")
+        logger.info(f"{'='*60}")
+        logger.info(f"Максимум источников за сессию: {max_sources}")
+        logger.info(f"Максимальная длительность: {session_duration_hours} часов")
+        logger.info(f"{'='*60}")
 
         session_start = datetime.now()
         session_end = session_start + timedelta(hours=session_duration_hours)
@@ -555,7 +557,7 @@ class AutoReviewsParser:
             source_info = self.get_next_source()
 
             if not source_info:
-                print("\n✅ Все источники обработаны!")
+                logger.info("\n✅ Все источники обработаны!")
                 break
 
             brand, model, source = source_info
@@ -563,7 +565,7 @@ class AutoReviewsParser:
             # Проверяем лимит отзывов для модели
             current_count = self.db.get_reviews_count(brand, model)
             if current_count >= Config.MAX_REVIEWS_PER_MODEL:
-                print(
+                logger.warning(
                     f"  ⚠️ Лимит отзывов для {brand} {model} достигнут ({current_count})"
                 )
                 self.mark_source_completed(brand, model, source, 0, 0)
@@ -578,7 +580,7 @@ class AutoReviewsParser:
                 # Пауза между источниками
                 if sources_processed < max_sources:
                     delay = random.uniform(30, 60)  # 30-60 секунд между источниками
-                    print(f"  ⏳ Пауза {delay:.1f} сек...")
+                    logger.info(f"  ⏳ Пауза {delay:.1f} сек...")
                     time.sleep(delay)
 
             except Exception as e:
@@ -593,32 +595,32 @@ class AutoReviewsParser:
         # Статистика сессии
         session_duration = datetime.now() - session_start
 
-        print(f"\n📊 СТАТИСТИКА СЕССИИ")
-        print(f"{'='*60}")
-        print(f"Длительность: {session_duration}")
-        print(f"Источников обработано: {sources_processed}")
-        print(f"Отзывов сохранено: {total_reviews_saved}")
-        print(f"{'='*60}")
+        logger.info(f"\n📊 СТАТИСТИКА СЕССИИ")
+        logger.info(f"{'='*60}")
+        logger.info(f"Длительность: {session_duration}")
+        logger.info(f"Источников обработано: {sources_processed}")
+        logger.info(f"Отзывов сохранено: {total_reviews_saved}")
+        logger.info(f"{'='*60}")
 
         # Общая статистика базы
         stats = self.db.get_parsing_stats()
-        print(f"\n📈 ОБЩАЯ СТАТИСТИКА БАЗЫ ДАННЫХ")
-        print(f"{'='*60}")
-        print(f"Всего отзывов: {stats['total_reviews']}")
-        print(f"Уникальных брендов: {stats['unique_brands']}")
-        print(f"Уникальных моделей: {stats['unique_models']}")
-        print(f"По источникам: {stats['by_source']}")
-        print(f"По типам: {stats['by_type']}")
-        print(f"{'='*60}")
+        logger.info(f"\n📈 ОБЩАЯ СТАТИСТИКА БАЗЫ ДАННЫХ")
+        logger.info(f"{'='*60}")
+        logger.info(f"Всего отзывов: {stats['total_reviews']}")
+        logger.info(f"Уникальных брендов: {stats['unique_brands']}")
+        logger.info(f"Уникальных моделей: {stats['unique_models']}")
+        logger.info(f"По источникам: {stats['by_source']}")
+        logger.info(f"По типам: {stats['by_type']}")
+        logger.info(f"{'='*60}")
 
     def run_continuous_parsing(
         self, daily_sessions: int = 4, session_sources: int = 10
     ):
         """Непрерывный парсинг с интервалами"""
-        print(f"\n🔄 РЕЖИМ НЕПРЕРЫВНОГО ПАРСИНГА")
-        print(f"Сессий в день: {daily_sessions}")
-        print(f"Источников за сессию: {session_sources}")
-        print(f"Интервал между сессиями: {24 // daily_sessions} часов")
+        logger.info(f"\n🔄 РЕЖИМ НЕПРЕРЫВНОГО ПАРСИНГА")
+        logger.info(f"Сессий в день: {daily_sessions}")
+        logger.info(f"Источников за сессию: {session_sources}")
+        logger.info(f"Интервал между сессиями: {24 // daily_sessions} часов")
 
         session_interval = timedelta(hours=24 // daily_sessions)
 
@@ -631,22 +633,22 @@ class AutoReviewsParser:
 
                 # Ждем до следующей сессии
                 next_session = datetime.now() + session_interval
-                print(
+                logger.info(
                     f"\n⏰ Следующая сессия: {next_session.strftime('%Y-%m-%d %H:%M:%S')}"
                 )
 
                 while datetime.now() < next_session:
                     remaining = next_session - datetime.now()
-                    print(f"⏳ До следующей сессии: {remaining}", end="\r")
+                    logger.info(f"⏳ До следующей сессии: {remaining}")
                     time.sleep(60)  # Проверяем каждую минуту
 
             except KeyboardInterrupt:
-                print("\n👋 Парсинг остановлен пользователем")
+                logger.info("\n👋 Парсинг остановлен пользователем")
                 break
             except Exception as e:
                 logging.error(f"Критическая ошибка в непрерывном парсинге: {e}")
-                print(f"❌ Критическая ошибка: {e}")
-                print("⏳ Пауза 30 минут перед повтором...")
+                logger.error(f"❌ Критическая ошибка: {e}")
+                logger.info("⏳ Пауза 30 минут перед повтором...")
                 time.sleep(1800)  # 30 минут пауза при критической ошибке
 
 
@@ -674,21 +676,21 @@ class ParserManager:
         """Показать статус базы данных и очереди"""
         stats = self.parser.db.get_parsing_stats()
 
-        print(f"\n📊 СТАТУС БАЗЫ ДАННЫХ")
-        print(f"{'='*50}")
-        print(f"Всего отзывов: {stats['total_reviews']:,}")
-        print(f"Уникальных брендов: {stats['unique_brands']}")
-        print(f"Уникальных моделей: {stats['unique_models']}")
+        logger.info(f"\n📊 СТАТУС БАЗЫ ДАННЫХ")
+        logger.info(f"{'='*50}")
+        logger.info(f"Всего отзывов: {stats['total_reviews']:,}")
+        logger.info(f"Уникальных брендов: {stats['unique_brands']}")
+        logger.info(f"Уникальных моделей: {stats['unique_models']}")
 
         if stats["by_source"]:
-            print(f"\nПо источникам:")
+            logger.info(f"\nПо источникам:")
             for source, count in stats["by_source"].items():
-                print(f"  {source}: {count:,}")
+                logger.info(f"  {source}: {count:,}")
 
         if stats["by_type"]:
-            print(f"\nПо типам:")
+            logger.info(f"\nПо типам:")
             for type_name, count in stats["by_type"].items():
-                print(f"  {type_name}: {count:,}")
+                logger.info(f"  {type_name}: {count:,}")
 
         # Статистика очереди
         conn = sqlite3.connect(self.parser.db.db_path)
@@ -699,24 +701,24 @@ class ParserManager:
 
         conn.close()
 
-        print(f"\n📋 СТАТУС ОЧЕРЕДИ")
-        print(f"{'='*50}")
+        logger.info(f"\n📋 СТАТУС ОЧЕРЕДИ")
+        logger.info(f"{'='*50}")
         total_sources = sum(queue_stats.values())
 
         for status, count in queue_stats.items():
             percentage = (count / total_sources * 100) if total_sources > 0 else 0
-            print(f"{status}: {count} ({percentage:.1f}%)")
+            logger.info(f"{status}: {count} ({percentage:.1f}%)")
 
-        print(f"Всего источников: {total_sources}")
+        logger.info(f"Всего источников: {total_sources}")
 
     def reset_queue(self):
         """Сброс очереди парсинга"""
-        print("🔄 Сброс очереди парсинга...")
+        logger.info("🔄 Сброс очереди парсинга...")
         self.parser.initialize_sources_queue()
 
     def export_data(self, output_format: str = "xlsx"):
         """Экспорт данных из базы"""
-        print(f"📤 Экспорт данных в формате {output_format}...")
+        logger.info(f"📤 Экспорт данных в формате {output_format}...")
 
         conn = sqlite3.connect(self.parser.db.db_path)
 
@@ -743,7 +745,7 @@ class ParserManager:
         conn.close()
 
         if not df_data:
-            print("❌ Нет данных для экспорта")
+            logger.error("❌ Нет данных для экспорта")
             return
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -751,15 +753,15 @@ class ParserManager:
         if output_format.lower() == "xlsx":
             filename = f"auto_reviews_export_{timestamp}.xlsx"
             bt.write_excel(df_data, filename.replace(".xlsx", ""))
-            print(f"✅ Данные экспортированы в {filename}")
+            logger.info(f"✅ Данные экспортированы в {filename}")
 
         elif output_format.lower() == "json":
             filename = f"auto_reviews_export_{timestamp}.json"
             bt.write_json(df_data, filename.replace(".json", ""))
-            print(f"✅ Данные экспортированы в {filename}")
+            logger.info(f"✅ Данные экспортированы в {filename}")
 
         else:
-            print(f"❌ Неподдерживаемый формат: {output_format}")
+            logger.error(f"❌ Неподдерживаемый формат: {output_format}")
 
 
 # ==================== ГЛАВНАЯ ФУНКЦИЯ ====================
@@ -799,16 +801,16 @@ def main():
     manager = ParserManager()
 
     if args.command == "init":
-        print("🚀 Инициализация парсера...")
+        logger.info("🚀 Инициализация парсера...")
         manager.reset_queue()
-        print("✅ Парсер готов к работе!")
+        logger.info("✅ Парсер готов к работе!")
 
     elif args.command == "parse":
-        print("🎯 Запуск разовой сессии парсинга...")
+        logger.info("🎯 Запуск разовой сессии парсинга...")
         manager.parser.run_parsing_session(max_sources=args.sources)
 
     elif args.command == "continuous":
-        print("🔄 Запуск непрерывного парсинга...")
+        logger.info("🔄 Запуск непрерывного парсинга...")
         manager.parser.run_continuous_parsing(
             daily_sessions=args.sessions, session_sources=args.sources
         )
