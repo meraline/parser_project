@@ -1,0 +1,23 @@
+from setuptools import setup, find_packages
+
+setup(
+    name="auto-reviews-parser",
+    version="0.1.0",
+    packages=find_packages(),
+    py_modules=["auto_reviews_parser", "data_analyzer"],
+    install_requires=[
+        "botasaurus>=4.0.88",
+        "pandas>=1.5.0",
+        "matplotlib>=3.6.0",
+        "seaborn>=0.12.0",
+        "requests>=2.28.0",
+        "beautifulsoup4>=4.11.0",
+        "lxml>=4.9.0",
+        "openpyxl>=3.0.0",
+        "flask>=2.3.0",
+        "python-dotenv>=1.0.0",
+        "prometheus-client>=0.16.0",
+        "redis>=5.0.0",
+    ],
+)
+
