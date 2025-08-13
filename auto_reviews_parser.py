@@ -73,7 +73,46 @@ class Config:
 
 # ==================== МОДЕЛИ ДАННЫХ ====================
 
-from parsers import ReviewData
+from dataclasses import dataclass
+
+
+@dataclass
+class ReviewData:
+    """Структура данных отзыва"""
+
+    source: str  # drom.ru, drive2.ru
+    type: str  # review, board_journal
+    brand: str
+    model: str
+    generation: Optional[str] = None
+    year: Optional[int] = None
+    url: str = ""
+    title: str = ""
+    content: str = ""
+    author: str = ""
+    rating: Optional[float] = None
+    pros: str = ""
+    cons: str = ""
+    mileage: Optional[int] = None
+    engine_volume: Optional[float] = None
+    fuel_type: str = ""
+    transmission: str = ""
+    body_type: str = ""
+    drive_type: str = ""
+    publish_date: Optional[datetime] = None
+    views_count: Optional[int] = None
+    likes_count: Optional[int] = None
+    comments_count: Optional[int] = None
+    parsed_at: datetime = None
+    content_hash: str = ""
+
+    def __post_init__(self):
+        if self.parsed_at is None:
+            self.parsed_at = datetime.now()
+        content_for_hash = (
+            f"{self.url}_{self.title}_{self.content[:100] if self.content else ''}"
+        )
+        self.content_hash = hashlib.md5(content_for_hash.encode()).hexdigest()
 
 # ==================== БАЗА ДАННЫХ ====================
 
@@ -308,14 +347,28 @@ from parsers import DromParser, Drive2Parser
 class AutoReviewsParser:
     """Главный класс парсера отзывов автомобилей"""
 
-    def __init__(self, db_path: str = Config.DB_PATH):
-        self.db = ReviewsDatabase(db_path)
+    def __init__(
+        self,
+        db: Optional[ReviewsDatabase] = None,
+        drom_parser: Optional[DromParser] = None,
+        drive2_parser: Optional[Drive2Parser] = None,
+        db_path: str = Config.DB_PATH,
+    ):
+        """Создает экземпляр основного парсера.
+
+        Параметры передаются опционально, что позволяет
+        использовать dependency-injector для управления
+        зависимостями при необходимости. При прямом создании
+        экземпляра поведение остаётся прежним.
+        """
+
+        self.db = db or ReviewsDatabase(db_path)
         self.setup_logging()
         self.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
         # Инициализация парсеров
-        self.drom_parser = DromParser(self.db)
-        self.drive2_parser = Drive2Parser(self.db)
+        self.drom_parser = drom_parser or DromParser(self.db)
+        self.drive2_parser = drive2_parser or Drive2Parser(self.db)
 
     def setup_logging(self):
         """Настройка логирования"""
@@ -424,23 +477,22 @@ class AutoReviewsParser:
         """Парсинг одного источника"""
         print(f"\n🎯 Парсинг: {brand} {model} на {source}")
 
-        reviews = []
         data = {"brand": brand, "model": model, "max_pages": Config.PAGES_PER_SESSION}
 
         try:
             if source == "drom.ru":
-                # Вызываем метод с передачей экземпляра парсера через metadata
-                reviews = self.drom_parser.parse_brand_model_reviews(
-                    data, metadata=self.drom_parser
-                )
+                reviews = self.drom_parser.parse_brand_model_reviews(data)
             elif source == "drive2.ru":
-                # Вызываем метод с правильной сигнатурой
                 reviews = self.drive2_parser.parse_brand_model_reviews(data)
-            if reviews is None:
+            else:
+                logging.warning(f"Unknown source: {source}")
+                return False
+
+            if not reviews:
                 logging.warning(
                     f"Parser returned no reviews for {brand} {model} on {source}"
                 )
-                reviews = []
+                return []
 
             # Сохраняем отзывы в базу
             saved_count = 0
@@ -459,7 +511,7 @@ class AutoReviewsParser:
 
         except Exception as e:
             logging.error(f"Критическая ошибка парсинга {brand} {model} {source}: {e}")
-            return 0
+            return False
 
     def run_parsing_session(
         self, max_sources: int = 10, session_duration_hours: int = 2
@@ -583,8 +635,19 @@ class AutoReviewsParser:
 class ParserManager:
     """Менеджер для управления парсером"""
 
-    def __init__(self, db_path: str = Config.DB_PATH):
-        self.parser = AutoReviewsParser(db_path)
+    def __init__(
+        self,
+        parser: Optional[AutoReviewsParser] = None,
+        db_path: str = Config.DB_PATH,
+    ):
+        """Создает менеджер парсера.
+
+        Параметр ``parser`` передается опционально, что позволяет
+        использовать внешний контейнер зависимостей. При отсутствии
+        значения создается собственный экземпляр ``AutoReviewsParser``.
+        """
+
+        self.parser = parser or AutoReviewsParser(db_path=db_path)
 
     def show_status(self):
         """Показать статус базы данных и очереди"""
