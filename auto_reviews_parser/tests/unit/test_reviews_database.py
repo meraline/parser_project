@@ -1,9 +1,14 @@
+import sys
 import sqlite3
 import pytest
+from pathlib import Path
 
-from src.database import ReviewsDatabase
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from src.database.reviews_database import ReviewsDatabase
 from src.models import ReviewData
->>>>>>>> origin/codex/restructure-project-directory-and-update-imports:auto_reviews_parser/tests/unit/test_reviews_database.py
 
 
 def test_init_database_creates_tables(tmp_path):
@@ -21,12 +26,6 @@ def test_insert_and_duplicate_review(tmp_path):
     db_path = tmp_path / "test.db"
     db = ReviewsDatabase(str(db_path))
     review = ReviewData(
-=======
-def test_insert_and_duplicate_review(tmp_path):
-    db_path = tmp_path / "test.db"
-    db = ReviewsDatabase(str(db_path))
-    review = Review(
->>>>>>> origin/codex/create-review-model-and-update-parsers:tests/test_reviews_database.py
         source="drom.ru",
         type="review",
         brand="Toyota",

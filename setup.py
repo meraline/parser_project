@@ -4,7 +4,6 @@ setup(
     name="auto-reviews-parser",
     version="0.1.0",
     packages=find_packages(),
-    py_modules=["auto_reviews_parser", "data_analyzer"],
     install_requires=[
         "botasaurus>=4.0.88",
         "pandas>=1.5.0",
