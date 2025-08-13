@@ -14,7 +14,7 @@ from dependency_injector import containers, providers
 from auto_reviews_parser import AutoReviewsParser, ParserManager, ReviewsDatabase
 from parsers import DromParser, Drive2Parser
 from review_repository import ReviewRepository
-from settings import Settings
+from config.settings import Settings
 
 
 class Container(containers.DeclarativeContainer):

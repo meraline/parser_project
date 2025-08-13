@@ -13,6 +13,15 @@ class Settings(BaseSettings):
     # Database
     db_path: str = "auto_reviews.db"
 
+    # Monitoring
+    prometheus_port: int = 8000
+
+    # Caching
+    redis_url: str = "redis://localhost:6379/0"
+
+    # Parallelism
+    max_workers: int = 4
+
     # Delays (in seconds)
     min_delay: int = 5
     max_delay: int = 15
