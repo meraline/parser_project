@@ -13,6 +13,7 @@ class Settings:
     """
 
     db_path: str = "auto_reviews.db"
+    redis_url: str = "redis://localhost:6379/0"
 
 
 __all__ = ["Settings"]

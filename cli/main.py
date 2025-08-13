@@ -15,12 +15,14 @@ from auto_reviews_parser import AutoReviewsParser, ParserManager, ReviewsDatabas
 from parsers import DromParser, Drive2Parser
 from review_repository import ReviewRepository
 from settings import Settings
+from src.utils.cache import RedisCache
 
 
 class Container(containers.DeclarativeContainer):
     """Application dependency injection container."""
 
     settings = providers.Singleton(Settings)
+    cache = providers.Singleton(RedisCache, url=settings.provided.redis_url)
 
     # Core components
     database = providers.Singleton(ReviewsDatabase, db_path=settings.provided.db_path)
@@ -73,6 +75,7 @@ def main() -> None:
     args = arg_parser.parse_args()
 
     container = Container()
+    container.cache()  # Initialize cache at startup
     manager = container.parser_manager()
 
     if args.command == "init":
