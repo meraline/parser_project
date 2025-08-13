@@ -4,12 +4,17 @@ import re
 from datetime import datetime, timedelta
 from typing import Optional
 
+from src.utils.logger import get_logger
+from src.utils.validators import validate_not_none
+
+logger = get_logger(__name__)
+
 
 class BaseParser:
     """Базовый парсер с общими утилитами"""
 
     def __init__(self, db):
-        self.db = db
+        self.db = validate_not_none(db, "db")
         self.session_stats = {
             "parsed": 0,
             "saved": 0,

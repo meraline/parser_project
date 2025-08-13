@@ -12,15 +12,19 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 import re
 import json
-import logging
 from urllib.parse import urljoin, urlparse
 import hashlib
 from pathlib import Path
+
+from src.utils.logger import get_logger
+from src.utils.validators import validate_non_empty_string
 
 from botasaurus.browser import browser, Driver
 from botasaurus.request import request, Request
 from botasaurus.soupify import soupify
 from botasaurus import bt
+
+logger = get_logger(__name__)
 
 # ==================== НАСТРОЙКИ ====================
 
@@ -73,7 +77,47 @@ class Config:
 
 # ==================== МОДЕЛИ ДАННЫХ ====================
 
-from parsers import ReviewData
+from dataclasses import dataclass
+from typing import Optional
+
+
+@dataclass
+class ReviewData:
+    """Структура данных отзыва"""
+
+    source: str  # drom.ru, drive2.ru
+    type: str  # review, board_journal
+    brand: str
+    model: str
+    generation: Optional[str] = None
+    year: Optional[int] = None
+    url: str = ""
+    title: str = ""
+    content: str = ""
+    author: str = ""
+    rating: Optional[float] = None
+    pros: str = ""
+    cons: str = ""
+    mileage: Optional[int] = None
+    engine_volume: Optional[float] = None
+    fuel_type: str = ""
+    transmission: str = ""
+    body_type: str = ""
+    drive_type: str = ""
+    publish_date: Optional[datetime] = None
+    views_count: Optional[int] = None
+    likes_count: Optional[int] = None
+    comments_count: Optional[int] = None
+    parsed_at: datetime = None
+    content_hash: str = ""
+
+    def __post_init__(self):
+        if self.parsed_at is None:
+            self.parsed_at = datetime.now()
+        content_for_hash = (
+            f"{self.url}_{self.title}_{self.content[:100] if self.content else ''}"
+        )
+        self.content_hash = hashlib.md5(content_for_hash.encode()).hexdigest()
 
 # ==================== БАЗА ДАННЫХ ====================
 
@@ -231,7 +275,7 @@ class ReviewsDatabase:
             # Дублирующая запись
             return False
         except Exception as e:
-            logging.error(f"Ошибка сохранения отзыва: {e}")
+            logger.error(f"Ошибка сохранения отзыва: {e}")
             return False
 
     def get_reviews_count(self, brand: str = None, model: str = None) -> int:
@@ -309,29 +353,13 @@ class AutoReviewsParser:
     """Главный класс парсера отзывов автомобилей"""
 
     def __init__(self, db_path: str = Config.DB_PATH):
+        validate_non_empty_string(db_path, "db_path")
         self.db = ReviewsDatabase(db_path)
-        self.setup_logging()
         self.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
         # Инициализация парсеров
         self.drom_parser = DromParser(self.db)
         self.drive2_parser = Drive2Parser(self.db)
-
-    def setup_logging(self):
-        """Настройка логирования"""
-        log_dir = Path("logs")
-        log_dir.mkdir(exist_ok=True)
-
-        log_file = log_dir / f"parser_{datetime.now().strftime('%Y%m%d')}.log"
-
-        logging.basicConfig(
-            level=logging.INFO,
-            format="%(asctime)s - %(levelname)s - %(message)s",
-            handlers=[
-                logging.FileHandler(log_file, encoding="utf-8"),
-                logging.StreamHandler(),
-            ],
-        )
 
     def initialize_sources_queue(self):
         """Инициализация очереди источников для парсинга"""
@@ -422,6 +450,8 @@ class AutoReviewsParser:
 
     def parse_single_source(self, brand: str, model: str, source: str) -> int:
         """Парсинг одного источника"""
+        brand = validate_non_empty_string(brand, "brand")
+        model = validate_non_empty_string(model, "model")
         print(f"\n🎯 Парсинг: {brand} {model} на {source}")
 
         reviews = []
@@ -429,18 +459,14 @@ class AutoReviewsParser:
 
         try:
             if source == "drom.ru":
-                # Вызываем метод с передачей экземпляра парсера через metadata
-                reviews = self.drom_parser.parse_brand_model_reviews(
-                    data, metadata=self.drom_parser
-                )
+                reviews = self.drom_parser.parse_brand_model_reviews(data)
             elif source == "drive2.ru":
-                # Вызываем метод с правильной сигнатурой
                 reviews = self.drive2_parser.parse_brand_model_reviews(data)
             if reviews is None:
-                logging.warning(
+                logger.warning(
                     f"Parser returned no reviews for {brand} {model} on {source}"
                 )
-                reviews = []
+                return False
 
             # Сохраняем отзывы в базу
             saved_count = 0
@@ -458,7 +484,7 @@ class AutoReviewsParser:
             return saved_count
 
         except Exception as e:
-            logging.error(f"Критическая ошибка парсинга {brand} {model} {source}: {e}")
+            logger.error(f"Критическая ошибка парсинга {brand} {model} {source}: {e}")
             return 0
 
     def run_parsing_session(
@@ -509,7 +535,7 @@ class AutoReviewsParser:
                     time.sleep(delay)
 
             except Exception as e:
-                logging.error(
+                logger.error(
                     f"Ошибка обработки источника {brand} {model} {source}: {e}"
                 )
                 sources_processed += 1
@@ -571,7 +597,7 @@ class AutoReviewsParser:
                 print("\n👋 Парсинг остановлен пользователем")
                 break
             except Exception as e:
-                logging.error(f"Критическая ошибка в непрерывном парсинге: {e}")
+                logger.error(f"Критическая ошибка в непрерывном парсинге: {e}")
                 print(f"❌ Критическая ошибка: {e}")
                 print("⏳ Пауза 30 минут перед повтором...")
                 time.sleep(1800)  # 30 минут пауза при критической ошибке
