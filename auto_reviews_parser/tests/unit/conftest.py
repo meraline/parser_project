@@ -62,16 +62,19 @@ sys.modules.setdefault("botasaurus.request", request_module)
 sys.modules.setdefault("botasaurus.soupify", soupify_module)
 sys.modules.setdefault("botasaurus.bt", bt_module)
 
-# Ensure project root is on the Python path
-ROOT_DIR = Path(__file__).resolve().parent.parent
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
+# Ensure project directories are on the Python path
+REPO_ROOT = Path(__file__).resolve().parents[3]
+PACKAGE_SRC = REPO_ROOT / "auto_reviews_parser" / "src"
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+if str(PACKAGE_SRC) not in sys.path:
+    sys.path.insert(0, str(PACKAGE_SRC))
 
 
 @pytest.fixture
 def test_db(tmp_path):
     """Provide a temporary database for tests."""
-    from auto_reviews_parser import ReviewsDatabase
+    from database import ReviewsDatabase
 
     db_path = tmp_path / "test.db"
     return ReviewsDatabase(str(db_path))
@@ -91,7 +94,7 @@ def parser_mocks():
 @pytest.fixture
 def auto_parser(parser_mocks):
     """AutoReviewsParser with mocked dependencies."""
-    from auto_reviews_parser import AutoReviewsParser
+    from services.auto_reviews_parser import AutoReviewsParser
 
     parser = AutoReviewsParser.__new__(AutoReviewsParser)
     parser.db = MagicMock()

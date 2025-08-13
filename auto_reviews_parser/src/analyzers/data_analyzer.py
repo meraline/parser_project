@@ -13,25 +13,19 @@ from typing import Dict, List, Tuple
 from pathlib import Path
 import json
 
-<<<<<<< HEAD
+from src.database.base import Database
 from src.utils.logger import get_logger
 from src.utils.validators import validate_non_empty_string
 
 logger = get_logger(__name__)
-=======
-from src.database.base import Database
->>>>>>> origin/codex/create-database-abstraction-and-repositories
 
 
 class ReviewsAnalyzer:
     """Анализатор собранных отзывов"""
 
     def __init__(self, db_path: str = "auto_reviews.db"):
-<<<<<<< HEAD
-        self.db_path = validate_non_empty_string(db_path, "db_path")
-=======
+        db_path = validate_non_empty_string(db_path, "db_path")
         self.db = Database(db_path)
->>>>>>> origin/codex/create-database-abstraction-and-repositories
         self.ensure_db_exists()
 
     def ensure_db_exists(self):
