@@ -1,27 +1,8 @@
 import sqlite3
-import types
-import pathlib
 import pytest
 
-
-def load_db_module():
-    path = pathlib.Path(__file__).resolve().parents[1] / "auto_reviews_parser.py"
-    lines = []
-    with path.open(encoding="utf-8") as f:
-        for line in f:
-            if line.startswith("class BaseParser"):
-                break
-            if "botasaurus" in line:
-                continue
-            lines.append(line)
-    module = types.ModuleType("db_module")
-    exec("".join(lines), module.__dict__)
-    return module
-
-
-db_module = load_db_module()
-ReviewData = db_module.ReviewData
-ReviewsDatabase = db_module.ReviewsDatabase
+from src.database import ReviewsDatabase
+from src.models import ReviewData
 
 
 def test_init_database_creates_tables(tmp_path):

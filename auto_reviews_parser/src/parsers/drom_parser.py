@@ -6,7 +6,7 @@ from urllib.parse import urljoin
 from botasaurus.browser import browser, Driver
 
 from .base_parser import BaseParser
-from .models import ReviewData
+from src.models import ReviewData
 
 
 class DromParser(BaseParser):
