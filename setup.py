@@ -18,6 +18,7 @@ setup(
         "python-dotenv>=1.0.0",
         "prometheus-client>=0.16.0",
         "redis>=5.0.0",
+        "fakeredis>=2.23.0",
     ],
 )
 
