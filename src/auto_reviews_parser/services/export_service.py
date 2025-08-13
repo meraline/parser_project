@@ -3,6 +3,10 @@ from datetime import datetime
 from typing import List, Dict
 
 from botasaurus import bt
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 class ExportService:
@@ -13,7 +17,7 @@ class ExportService:
 
     def export_data(self, output_format: str = "xlsx") -> None:
         """Экспорт данных из базы"""
-        print(f"📤 Экспорт данных в формате {output_format}...")
+        logger.info(f"📤 Экспорт данных в формате {output_format}...")
 
         conn = sqlite3.connect(self.db_path)
         query = """
@@ -32,17 +36,17 @@ class ExportService:
         conn.close()
 
         if not df_data:
-            print("❌ Нет данных для экспорта")
+            logger.error("❌ Нет данных для экспорта")
             return
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         if output_format.lower() == "xlsx":
             filename = f"auto_reviews_export_{timestamp}.xlsx"
             bt.write_excel(df_data, filename.replace(".xlsx", ""))
-            print(f"✅ Данные экспортированы в {filename}")
+            logger.info(f"✅ Данные экспортированы в {filename}")
         elif output_format.lower() == "json":
             filename = f"auto_reviews_export_{timestamp}.json"
             bt.write_json(df_data, filename.replace(".json", ""))
-            print(f"✅ Данные экспортированы в {filename}")
+            logger.info(f"✅ Данные экспортированы в {filename}")
         else:
-            print(f"❌ Неподдерживаемый формат: {output_format}")
+            logger.error(f"❌ Неподдерживаемый формат: {output_format}")

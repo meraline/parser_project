@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import json
+import logging
 
 from .auto_reviews_parser import AutoReviewsParser, Config
 
 from .queue_service import QueueService
 from .export_service import ExportService
 from ..utils.cache import RedisCache
+
+
+logger = logging.getLogger(__name__)
 
 
 class ParserService:
@@ -38,34 +42,34 @@ class ParserService:
         """Показать статус базы данных и очереди"""
         data = self.get_status_data()
         stats = data["stats"]
-        print("\n📊 СТАТУС БАЗЫ ДАННЫХ")
-        print("=" * 50)
-        print(f"Всего отзывов: {stats['total_reviews']:,}")
-        print(f"Уникальных брендов: {stats['unique_brands']}")
-        print(f"Уникальных моделей: {stats['unique_models']}")
+        logger.info("\n📊 СТАТУС БАЗЫ ДАННЫХ")
+        logger.info("=" * 50)
+        logger.info(f"Всего отзывов: {stats['total_reviews']:,}")
+        logger.info(f"Уникальных брендов: {stats['unique_brands']}")
+        logger.info(f"Уникальных моделей: {stats['unique_models']}")
 
         if stats["by_source"]:
-            print("\nПо источникам:")
+            logger.info("\nПо источникам:")
             for source, count in stats["by_source"].items():
-                print(f"  {source}: {count:,}")
+                logger.info(f"  {source}: {count:,}")
 
         if stats["by_type"]:
-            print("\nПо типам:")
+            logger.info("\nПо типам:")
             for type_name, count in stats["by_type"].items():
-                print(f"  {type_name}: {count:,}")
+                logger.info(f"  {type_name}: {count:,}")
 
         queue_stats = data["queue_stats"]
-        print("\n📋 СТАТУС ОЧЕРЕДИ")
-        print("=" * 50)
+        logger.info("\n📋 СТАТУС ОЧЕРЕДИ")
+        logger.info("=" * 50)
         total_sources = sum(queue_stats.values())
         for status, count in queue_stats.items():
             percentage = (count / total_sources * 100) if total_sources > 0 else 0
-            print(f"{status}: {count} ({percentage:.1f}%)")
-        print(f"Всего источников: {total_sources}")
+            logger.info(f"{status}: {count} ({percentage:.1f}%)")
+        logger.info(f"Всего источников: {total_sources}")
 
     def reset_queue(self) -> None:
         """Сброс очереди парсинга"""
-        print("🔄 Сброс очереди парсинга...")
+        logger.info("🔄 Сброс очереди парсинга...")
         self.queue_service.initialize_queue()
 
     def export_data(self, output_format: str = "xlsx") -> None:
