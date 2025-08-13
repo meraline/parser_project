@@ -1,65 +1,8 @@
-import sys
-import types
-import importlib.util
-from pathlib import Path
-from unittest.mock import MagicMock
 from bs4 import BeautifulSoup
+from unittest.mock import MagicMock
 
-# Stub out botasaurus modules to avoid heavy dependencies during import
-botsaurus = types.ModuleType("botasaurus")
-
-browser_mod = types.ModuleType("botasaurus.browser")
-
-def browser(*args, **kwargs):
-    def decorator(func):
-        return func
-    return decorator
-
-class Driver:  # placeholder for type hints
-    pass
-
-browser_mod.browser = browser
-browser_mod.Driver = Driver
-
-request_mod = types.ModuleType("botasaurus.request")
-class Request:  # minimal placeholder
-    pass
-
-def request(*args, **kwargs):
-    return None
-request_mod.Request = Request
-request_mod.request = request
-
-soupify_mod = types.ModuleType("botasaurus.soupify")
-
-def soupify(*args, **kwargs):
-    return None
-soupify_mod.soupify = soupify
-
-bt_mod = types.ModuleType("botasaurus.bt")
-
-def write_excel(*args, **kwargs):
-    return None
-
-def write_json(*args, **kwargs):
-    return None
-bt_mod.write_excel = write_excel
-bt_mod.write_json = write_json
-
-# Register stub modules
-sys.modules.setdefault("botasaurus", botsaurus)
-sys.modules.setdefault("botasaurus.browser", browser_mod)
-sys.modules.setdefault("botasaurus.request", request_mod)
-sys.modules.setdefault("botasaurus.soupify", soupify_mod)
-sys.modules.setdefault("botasaurus.bt", bt_mod)
-
-# Import parser classes from the project module (test.py)
-spec = importlib.util.spec_from_file_location("parser_module", Path(__file__).resolve().parent.parent / "test.py")
-parser_module = importlib.util.module_from_spec(spec)
-assert spec.loader is not None
-spec.loader.exec_module(parser_module)
-DromParser = parser_module.DromParser
-Drive2Parser = parser_module.Drive2Parser
+from parsers.drom_parser import DromParser
+from parsers.drive2_parser import Drive2Parser
 
 
 class MockElement:
