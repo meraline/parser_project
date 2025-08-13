@@ -1,8 +1,11 @@
 import sys
 import types
-import importlib.util
 from pathlib import Path
 from unittest.mock import MagicMock
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 from bs4 import BeautifulSoup
 
 # Stub out botasaurus modules to avoid heavy dependencies during import
@@ -53,13 +56,9 @@ sys.modules.setdefault("botasaurus.request", request_mod)
 sys.modules.setdefault("botasaurus.soupify", soupify_mod)
 sys.modules.setdefault("botasaurus.bt", bt_mod)
 
-# Import parser classes from the project module (test.py)
-spec = importlib.util.spec_from_file_location("parser_module", Path(__file__).resolve().parent.parent / "test.py")
-parser_module = importlib.util.module_from_spec(spec)
-assert spec.loader is not None
-spec.loader.exec_module(parser_module)
-DromParser = parser_module.DromParser
-Drive2Parser = parser_module.Drive2Parser
+# Import parser classes from the project module
+from src.parsers.drom_parser import DromParser
+from src.parsers.drive2_parser import Drive2Parser
 
 
 class MockElement:

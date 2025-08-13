@@ -8,7 +8,7 @@ from unittest.mock import Mock
 import pytest
 
 # Ensure project root is on the Python path
-ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
@@ -62,14 +62,14 @@ botasaurus_pkg.request = request_module
 botasaurus_pkg.soupify = soupify_module
 botasaurus_pkg.bt = bt_module
 
-from auto_reviews_parser import AutoReviewsParser
+from src.services import AutoReviewsParser
 
 
 @pytest.mark.parametrize("source", ["drom.ru", "drive2.ru"])
 def test_parse_single_source_returns_false_and_logs_warning(source, caplog):
     parser = AutoReviewsParser.__new__(AutoReviewsParser)
-    parser.drom_parser = SimpleNamespace(parse_brand_model_reviews=lambda data: None)
-    parser.drive2_parser = SimpleNamespace(parse_brand_model_reviews=lambda data: None)
+    parser.drom_parser = SimpleNamespace(parse_brand_model_reviews=lambda *args, **kwargs: None)
+    parser.drive2_parser = SimpleNamespace(parse_brand_model_reviews=lambda *args, **kwargs: None)
     parser.db = Mock()
     parser.db.save_review.return_value = True
     parser.mark_source_completed = Mock()
@@ -77,7 +77,7 @@ def test_parse_single_source_returns_false_and_logs_warning(source, caplog):
     with caplog.at_level(logging.WARNING):
         result = AutoReviewsParser.parse_single_source(parser, "Brand", "Model", source)
 
-    assert result is False or result == []
+    assert not result
     assert any(record.levelno == logging.WARNING for record in caplog.records)
     parser.db.save_review.assert_not_called()
-    parser.mark_source_completed.assert_not_called()
+    parser.mark_source_completed.assert_called_once()
