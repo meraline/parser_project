@@ -5,6 +5,7 @@ from urllib.parse import urljoin
 from botasaurus.browser import browser, Driver
 
 from .base_parser import BaseParser
+<<<<<<< HEAD:parsers/drom_parser.py
 <<<<<<< HEAD
 from .models import ReviewData
 from src.utils.logger import get_logger
@@ -14,6 +15,9 @@ logger = get_logger(__name__)
 =======
 from src.models.review import Review
 >>>>>>> origin/codex/create-review-model-and-update-parsers
+=======
+from src.models import ReviewData
+>>>>>>> origin/codex/restructure-project-directory-and-update-imports:auto_reviews_parser/src/parsers/drom_parser.py
 
 
 class DromParser(BaseParser):

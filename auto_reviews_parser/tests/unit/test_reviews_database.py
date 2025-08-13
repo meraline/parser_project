@@ -1,6 +1,7 @@
 import sqlite3
 import pytest
 
+<<<<<<<< HEAD:auto_reviews_parser/tests/unit/integration/test_reviews_database.py
 from parsers.models import ReviewData
 from auto_reviews_parser import ReviewsDatabase
 
@@ -12,6 +13,10 @@ def test_init_database_creates_tables(test_db):
 db_module = load_db_module()
 Review = db_module.Review
 ReviewsDatabase = db_module.ReviewsDatabase
+========
+from src.database import ReviewsDatabase
+from src.models import ReviewData
+>>>>>>>> origin/codex/restructure-project-directory-and-update-imports:auto_reviews_parser/tests/unit/test_reviews_database.py
 
 
 def test_init_database_creates_tables(tmp_path):

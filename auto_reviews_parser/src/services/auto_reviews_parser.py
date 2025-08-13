@@ -1,6 +1,4 @@
-#!/usr/bin/env python3
-"""
-Стабильный парсер отзывов и бортжурналов для автомобилей
+"""Стабильный парсер отзывов и бортжурналов для автомобилей
 Собирает данные с Drom.ru и Drive2.ru в базу данных
 Работает в щадящем режиме для долгосрочного сбора данных
 """
@@ -39,6 +37,7 @@ from botasaurus.request import request, Request
 from botasaurus.soupify import soupify
 from botasaurus import bt
 
+<<<<<<< HEAD:auto_reviews_parser.py
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -489,6 +488,12 @@ class ReviewsDatabase:
 
 from parsers import DromParser, Drive2Parser
 
+=======
+from src.config.settings import Config
+from src.database.reviews_database import ReviewsDatabase
+from src.parsers import DromParser, Drive2Parser
+from src.models import ReviewData
+>>>>>>> origin/codex/restructure-project-directory-and-update-imports:auto_reviews_parser/src/services/auto_reviews_parser.py
 
 # ==================== ГЛАВНЫЙ ПАРСЕР ====================
 
