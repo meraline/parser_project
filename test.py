@@ -500,7 +500,7 @@ class DromParser(BaseParser):
 
     @browser(
         block_images=True,
-        cache=True,
+        cache=False,
         reuse_driver=True,
         max_retry=3,
         user_agent=random.choice(Config.USER_AGENTS),
@@ -670,7 +670,7 @@ class Drive2Parser(BaseParser):
 
     @browser(
         block_images=True,
-        cache=True,
+        cache=False,
         reuse_driver=True,
         max_retry=3,
         user_agent=random.choice(Config.USER_AGENTS),
