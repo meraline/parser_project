@@ -21,7 +21,9 @@ class ParserService:
     ):
         self.queue_service = QueueService(db_path, Config.TARGET_BRANDS)
         self.export_service = ExportService(db_path)
-        self.parser = AutoReviewsParser(db_path, queue_service=self.queue_service)
+        self.parser = AutoReviewsParser(
+            db_path=db_path, queue_service=self.queue_service
+        )
         self.cache = cache
 
     def get_status_data(self) -> dict:

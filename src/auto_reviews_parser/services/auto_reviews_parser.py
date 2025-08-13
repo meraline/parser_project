@@ -22,6 +22,7 @@ from botasaurus.request import request, Request
 from botasaurus.soupify import soupify
 from botasaurus import bt
 from .parallel_parser import ParallelParserService
+from .queue_service import QueueService
 
 from ..utils.metrics import setup_metrics
 
@@ -318,6 +319,7 @@ class AutoReviewsParser:
         drive2_parser: Optional[Drive2Parser] = None,
         db_path: str = Config.DB_PATH,
         max_workers: int = 4,
+        queue_service: QueueService | None = None,
     ):
         """Создает экземпляр основного парсера.
 
@@ -328,6 +330,7 @@ class AutoReviewsParser:
         """
 
         self.db = db or ReviewsDatabase(db_path)
+        self.queue_service = queue_service
         self.setup_logging()
         self.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -360,6 +363,10 @@ class AutoReviewsParser:
 
     def initialize_sources_queue(self):
         """Инициализация очереди источников для парсинга"""
+        if self.queue_service:
+            self.queue_service.initialize_queue()
+            return
+
         conn = sqlite3.connect(self.db.db_path)
         cursor = conn.cursor()
 
@@ -390,14 +397,17 @@ class AutoReviewsParser:
 
     def get_next_source(self) -> Optional[Tuple[str, str, str]]:
         """Получение следующего источника для парсинга"""
+        if self.queue_service:
+            return self.queue_service.get_next_source()
+
         conn = sqlite3.connect(self.db.db_path)
         cursor = conn.cursor()
 
         # Ищем неспарсенные источники, сортируем по приоритету
         cursor.execute(
             """
-            SELECT id, brand, model, source FROM sources_queue 
-            WHERE status = 'pending' 
+            SELECT id, brand, model, source FROM sources_queue
+            WHERE status = 'pending'
             ORDER BY priority DESC, RANDOM()
             LIMIT 1
         """
@@ -411,8 +421,8 @@ class AutoReviewsParser:
             # Отмечаем как обрабатываемый
             cursor.execute(
                 """
-                UPDATE sources_queue 
-                SET status = 'processing', last_parsed = CURRENT_TIMESTAMP 
+                UPDATE sources_queue
+                SET status = 'processing', last_parsed = CURRENT_TIMESTAMP
                 WHERE id = ?
             """,
                 (source_id,),
@@ -430,12 +440,18 @@ class AutoReviewsParser:
         self, brand: str, model: str, source: str, pages_parsed: int, reviews_found: int
     ):
         """Отметка источника как завершенного"""
+        if self.queue_service:
+            self.queue_service.mark_source_completed(
+                brand, model, source, pages_parsed, reviews_found
+            )
+            return
+
         conn = sqlite3.connect(self.db.db_path)
         cursor = conn.cursor()
 
         cursor.execute(
             """
-            UPDATE sources_queue 
+            UPDATE sources_queue
             SET status = 'completed', parsed_pages = ?, total_pages = ?
             WHERE brand = ? AND model = ? AND source = ?
         """,
@@ -444,6 +460,18 @@ class AutoReviewsParser:
 
         conn.commit()
         conn.close()
+
+    def get_queue_stats(self) -> Dict[str, int]:
+        """Получение статистики очереди"""
+        if self.queue_service:
+            return self.queue_service.get_queue_stats()
+
+        conn = sqlite3.connect(self.db.db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT status, COUNT(*) FROM sources_queue GROUP BY status")
+        stats = dict(cursor.fetchall())
+        conn.close()
+        return stats
 
     def parse_single_source(self, brand: str, model: str, source: str) -> int:
         """Парсинг одного источника"""
