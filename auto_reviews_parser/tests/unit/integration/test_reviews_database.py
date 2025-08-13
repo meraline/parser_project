@@ -1,8 +1,7 @@
 import sqlite3
 import pytest
 
-from parsers.models import ReviewData
-from auto_reviews_parser import ReviewsDatabase
+from src.models.review import Review
 
 
 def test_init_database_creates_tables(test_db):
@@ -14,15 +13,8 @@ def test_init_database_creates_tables(test_db):
     assert {"reviews", "parsing_stats", "sources_queue"} <= tables
 
 
-<<<<<<< HEAD:tests/integration/test_reviews_database.py
 def test_insert_and_duplicate_review(test_db):
-    review = ReviewData(
-=======
-def test_insert_and_duplicate_review(tmp_path):
-    db_path = tmp_path / "test.db"
-    db = ReviewsDatabase(str(db_path))
     review = Review(
->>>>>>> origin/codex/create-review-model-and-update-parsers:tests/test_reviews_database.py
         source="drom.ru",
         type="review",
         brand="Toyota",

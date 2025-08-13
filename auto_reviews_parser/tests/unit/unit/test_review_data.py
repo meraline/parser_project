@@ -1,15 +1,7 @@
 import hashlib
 from datetime import datetime
 
-<<<<<<<< HEAD:auto_reviews_parser/tests/unit/unit/test_review_data.py
-<<<<<<<< HEAD:tests/unit/test_review_data.py
-from parsers.models import ReviewData
-========
 from src.models.review import Review
->>>>>>>> origin/codex/create-review-model-and-update-parsers:tests/test_review.py
-========
-from src.models import ReviewData
->>>>>>>> origin/codex/restructure-project-directory-and-update-imports:auto_reviews_parser/tests/unit/test_review_data.py
 
 
 def test_parsed_at_auto_set():

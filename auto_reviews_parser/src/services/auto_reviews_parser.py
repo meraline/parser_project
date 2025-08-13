@@ -9,7 +9,7 @@ import sqlite3
 import time
 import random
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import re
 import json
 import logging
@@ -21,6 +21,7 @@ from botasaurus.browser import browser, Driver
 from botasaurus.request import request, Request
 from botasaurus.soupify import soupify
 from botasaurus import bt
+from .parallel_parser import ParallelParserService
 
 from src.utils.metrics import setup_metrics
 
@@ -355,6 +356,7 @@ class AutoReviewsParser:
         drom_parser: Optional[DromParser] = None,
         drive2_parser: Optional[Drive2Parser] = None,
         db_path: str = Config.DB_PATH,
+        max_workers: int = 4,
     ):
         """Создает экземпляр основного парсера.
 
@@ -373,6 +375,11 @@ class AutoReviewsParser:
         # Инициализация парсеров
         self.drom_parser = drom_parser or DromParser(self.db)
         self.drive2_parser = drive2_parser or Drive2Parser(self.db)
+        self.parsers: Dict[str, Any] = {
+            "drom.ru": self.drom_parser,
+            "drive2.ru": self.drive2_parser,
+        }
+        self.parallel_parser = ParallelParserService(self.parsers, max_workers)
 
     def setup_logging(self):
         """Настройка логирования"""
@@ -516,6 +523,54 @@ class AutoReviewsParser:
         except Exception as e:
             logging.error(f"Критическая ошибка парсинга {brand} {model} {source}: {e}")
             return False
+
+    def parse_multiple_sources(
+        self,
+        sources: List[Tuple[str, str, str]],
+        parallel: bool = False,
+    ) -> List[Tuple[Tuple[str, str, str], List[ReviewData]]]:
+        """Парсинг нескольких источников.
+
+        При ``parallel=True`` использует ``ThreadPoolExecutor``
+        через ``ParallelParserService``.
+        """
+
+        if parallel:
+            parse_results = self.parallel_parser.parse_multiple_sources(
+                sources, max_pages=Config.PAGES_PER_SESSION
+            )
+        else:
+            parse_results: List[Tuple[Tuple[str, str, str], List[ReviewData]]] = []
+            for brand, model, source in sources:
+                parser = self.parsers.get(source)
+                if parser is None:
+                    logging.warning(f"Unknown source: {source}")
+                    parse_results.append(((brand, model, source), []))
+                    continue
+                data = {
+                    "brand": brand,
+                    "model": model,
+                    "max_pages": Config.PAGES_PER_SESSION,
+                }
+                try:
+                    reviews = parser.parse_brand_model_reviews(data)
+                except Exception:
+                    logging.error(
+                        f"Ошибка парсинга {brand} {model} {source}", exc_info=True
+                    )
+                    reviews = []
+                parse_results.append(((brand, model, source), reviews))
+
+        for (brand, model, source), reviews in parse_results:
+            saved_count = 0
+            for review in reviews:
+                if self.db.save_review(review):
+                    saved_count += 1
+            self.mark_source_completed(
+                brand, model, source, Config.PAGES_PER_SESSION, saved_count
+            )
+
+        return parse_results
 
     def run_parsing_session(
         self, max_sources: int = 10, session_duration_hours: int = 2
