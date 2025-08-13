@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from parsers import Review
+from auto_reviews_parser.parsers import Review
 from auto_reviews_parser import ReviewsDatabase
 
 

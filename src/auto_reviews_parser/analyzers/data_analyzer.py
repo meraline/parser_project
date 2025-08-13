@@ -13,9 +13,9 @@ from typing import Dict, List, Tuple
 from pathlib import Path
 import json
 
-from src.database.base import Database
-from src.utils.logger import get_logger
-from src.utils.validators import validate_non_empty_string
+from ..database.base import Database
+from ..utils.logger import get_logger
+from ..utils.validators import validate_non_empty_string
 
 logger = get_logger(__name__)
 

@@ -18,11 +18,11 @@ import sys
 from dependency_injector import containers, providers
 
 from auto_reviews_parser import AutoReviewsParser, ParserManager, ReviewsDatabase
-from parsers import DromParser, Drive2Parser
+from auto_reviews_parser.parsers import DromParser, Drive2Parser
 from review_repository import ReviewRepository
 
 from settings import Settings
-from src.utils.cache import RedisCache
+from auto_reviews_parser.utils.cache import RedisCache
 
 
 class Container(containers.DeclarativeContainer):

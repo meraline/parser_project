@@ -1,1 +1,0 @@
-"""Test package for auto_reviews_parser."""

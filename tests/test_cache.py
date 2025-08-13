@@ -6,10 +6,10 @@ import types
 import fakeredis
 import redis
 
-sys.path.append(str(Path(__file__).resolve().parents[1]))
+sys.path.append(str(Path(__file__).resolve().parents[1] / "src"))
 
-# Create a minimal stub for auto_reviews_parser module required by ParserService
-dummy_module = types.ModuleType("auto_reviews_parser")
+# Create a minimal stub for AutoReviewsParser module required by ParserService
+dummy_module = types.ModuleType("auto_reviews_parser.services.auto_reviews_parser")
 
 class _Config:
     DB_PATH = ":memory:"
@@ -21,12 +21,30 @@ class _Parser:
         self.db = types.SimpleNamespace(get_parsing_stats=lambda: {})
 
 
+class _ReviewsDatabase:
+    def get_parsing_stats(self):
+        return {}
+
+
+class _ParserManager:
+    def __init__(self, parser=None):
+        self.parser = parser
+    def reset_queue(self):
+        pass
+    def export_data(self, output_format="xlsx"):
+        pass
+    def show_status(self):
+        pass
+
+
 dummy_module.Config = _Config
 dummy_module.AutoReviewsParser = _Parser
-sys.modules["auto_reviews_parser"] = dummy_module
+dummy_module.ReviewsDatabase = _ReviewsDatabase
+dummy_module.ParserManager = _ParserManager
+sys.modules["auto_reviews_parser.services.auto_reviews_parser"] = dummy_module
 
-from src.utils.cache import RedisCache
-from src.services.parser_service import ParserService
+from auto_reviews_parser.utils.cache import RedisCache
+from auto_reviews_parser.services.parser_service import ParserService
 
 
 def _fake_from_url(url: str, decode_responses: bool = True):

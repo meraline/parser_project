@@ -9,8 +9,8 @@ A parser for collecting car reviews and logs from **Drom.ru** and **Drive2.ru**.
 
 ```bash
 pip install -r requirements.txt
-python auto_reviews_parser.py init
-python auto_reviews_parser.py parse --sources 3
+python cli/main.py init
+python cli/main.py parse --sources 3
 ```
 
 
