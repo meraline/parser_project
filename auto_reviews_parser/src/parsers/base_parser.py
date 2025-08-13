@@ -95,6 +95,34 @@ class BaseParser:
                     continue
         return None
 
+    def extract_common_fields(self, text: str) -> dict:
+        """Извлечение общих характеристик автомобиля из текста."""
+        normalized = self.normalize_text(text)
+        lower = normalized.lower()
+        fields = {
+            "year": self.extract_year(normalized),
+            "engine_volume": self.extract_engine_volume(normalized),
+            "mileage": self.extract_mileage(normalized),
+            "fuel_type": "",
+            "transmission": "",
+            "drive_type": "",
+        }
+        if "бензин" in lower:
+            fields["fuel_type"] = "бензин"
+        elif "дизель" in lower:
+            fields["fuel_type"] = "дизель"
+        if "автомат" in lower:
+            fields["transmission"] = "автомат"
+        elif "механ" in lower:
+            fields["transmission"] = "механика"
+        if "полный" in lower or "4wd" in lower:
+            fields["drive_type"] = "полный"
+        elif "передний" in lower or "fwd" in lower:
+            fields["drive_type"] = "передний"
+        elif "задний" in lower or "rwd" in lower:
+            fields["drive_type"] = "задний"
+        return fields
+
     def _parse_date(self, date_text: str) -> Optional[datetime]:
         """Парсинг даты из текста"""
         try:

@@ -5,18 +5,18 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
 from .base import BaseParser
-from .models import ReviewData
+from .models import Review
 
 
 class DromParser(BaseParser):
     """Parser for reviews from drom.ru pages."""
 
-    async def parse_reviews(self, html: str, brand: str, model: str) -> List[ReviewData]:
+    async def parse_reviews(self, html: str, brand: str, model: str) -> List[Review]:
         soup = BeautifulSoup(html, "html.parser")
         cards = soup.select('[data-ftid="component_reviews-item"], .css-1ksh4lf')
-        reviews: List[ReviewData] = []
+        reviews: List[Review] = []
         for card in cards:
-            review = ReviewData(source="drom.ru", type="review", brand=brand, model=model)
+            review = Review(source="drom.ru", type="review", brand=brand, model=model)
 
             title_link = card.select_one('h3 a, a[data-ftid="component_reviews-item-title"]')
             if title_link:

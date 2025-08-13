@@ -3,7 +3,7 @@ import sqlite3
 from typing import Dict, Optional
 
 from ..base import Database
-from parsers.models import ReviewData
+from parsers.models import Review
 
 
 class ReviewRepository:
@@ -63,7 +63,7 @@ class ReviewRepository:
             )
             conn.commit()
 
-    def save(self, review: ReviewData) -> bool:
+    def save(self, review: Review) -> bool:
         """Сохранение отзыва."""
         try:
             with self.db.connection() as conn:

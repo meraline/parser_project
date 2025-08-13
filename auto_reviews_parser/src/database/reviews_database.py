@@ -2,14 +2,14 @@ import sqlite3
 import logging
 from typing import Dict
 
-from src.config.settings import Config
-from src.models import ReviewData
+from src.config.settings import settings
+from src.models import Review
 
 
 class ReviewsDatabase:
     """Управление базой данных отзывов"""
 
-    def __init__(self, db_path: str = Config.DB_PATH):
+    def __init__(self, db_path: str = settings.db_path):
         self.db_path = db_path
         self.init_database()
 
@@ -106,7 +106,7 @@ class ReviewsDatabase:
         conn.commit()
         conn.close()
 
-    def save_review(self, review: ReviewData) -> bool:
+    def save_review(self, review: Review) -> bool:
         """Сохранение отзыва в базу"""
         try:
             conn = sqlite3.connect(self.db_path)

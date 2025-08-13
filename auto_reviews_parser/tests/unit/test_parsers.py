@@ -57,8 +57,8 @@ sys.modules.setdefault("botasaurus.soupify", soupify_mod)
 sys.modules.setdefault("botasaurus.bt", bt_mod)
 
 # Import parser classes from the project module
-from src.parsers.drom_parser import DromParser
-from src.parsers.drive2_parser import Drive2Parser
+from parsers.drom_parser import DromParser
+from parsers.drive2_parser import Drive2Parser
 
 
 class MockElement:

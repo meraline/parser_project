@@ -23,7 +23,7 @@ from botasaurus.soupify import soupify
 from botasaurus import bt
 from .parallel_parser import ParallelParserService
 
-from src.utils.metrics import setup_metrics
+from utils.metrics import setup_metrics
 
 # ==================== НАСТРОЙКИ ====================
 
@@ -76,46 +76,7 @@ class Config:
 
 # ==================== МОДЕЛИ ДАННЫХ ====================
 
-from dataclasses import dataclass
-
-
-@dataclass
-class ReviewData:
-    """Структура данных отзыва"""
-
-    source: str  # drom.ru, drive2.ru
-    type: str  # review, board_journal
-    brand: str
-    model: str
-    generation: Optional[str] = None
-    year: Optional[int] = None
-    url: str = ""
-    title: str = ""
-    content: str = ""
-    author: str = ""
-    rating: Optional[float] = None
-    pros: str = ""
-    cons: str = ""
-    mileage: Optional[int] = None
-    engine_volume: Optional[float] = None
-    fuel_type: str = ""
-    transmission: str = ""
-    body_type: str = ""
-    drive_type: str = ""
-    publish_date: Optional[datetime] = None
-    views_count: Optional[int] = None
-    likes_count: Optional[int] = None
-    comments_count: Optional[int] = None
-    parsed_at: datetime = None
-    content_hash: str = ""
-
-    def __post_init__(self):
-        if self.parsed_at is None:
-            self.parsed_at = datetime.now()
-        content_for_hash = (
-            f"{self.url}_{self.title}_{self.content[:100] if self.content else ''}"
-        )
-        self.content_hash = hashlib.md5(content_for_hash.encode()).hexdigest()
+from src.models import Review
 
 # ==================== БАЗА ДАННЫХ ====================
 
@@ -220,7 +181,7 @@ class ReviewsDatabase:
         conn.commit()
         conn.close()
 
-    def save_review(self, review: ReviewData) -> bool:
+    def save_review(self, review: Review) -> bool:
         """Сохранение отзыва в базу"""
         try:
             conn = sqlite3.connect(self.db_path)
@@ -503,7 +464,8 @@ class AutoReviewsParser:
                 logging.warning(
                     f"Parser returned no reviews for {brand} {model} on {source}"
                 )
-                return []
+                self.mark_source_completed(brand, model, source, Config.PAGES_PER_SESSION, 0)
+                return 0
 
             # Сохраняем отзывы в базу
             saved_count = 0
@@ -528,7 +490,7 @@ class AutoReviewsParser:
         self,
         sources: List[Tuple[str, str, str]],
         parallel: bool = False,
-    ) -> List[Tuple[Tuple[str, str, str], List[ReviewData]]]:
+    ) -> List[Tuple[Tuple[str, str, str], List[Review]]]:
         """Парсинг нескольких источников.
 
         При ``parallel=True`` использует ``ThreadPoolExecutor``
@@ -540,7 +502,7 @@ class AutoReviewsParser:
                 sources, max_pages=Config.PAGES_PER_SESSION
             )
         else:
-            parse_results: List[Tuple[Tuple[str, str, str], List[ReviewData]]] = []
+            parse_results: List[Tuple[Tuple[str, str, str], List[Review]]] = []
             for brand, model, source in sources:
                 parser = self.parsers.get(source)
                 if parser is None:

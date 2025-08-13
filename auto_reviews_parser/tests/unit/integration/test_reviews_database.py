@@ -1,7 +1,7 @@
 import sqlite3
 import pytest
 
-from src.models.review import Review
+from src.models import Review
 
 
 def test_init_database_creates_tables(test_db):

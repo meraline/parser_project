@@ -6,9 +6,8 @@ from botasaurus.browser import browser, Driver
 
 from .base_parser import BaseParser
 
-from src.utils.metrics import track_parsing
-from .models import ReviewData
-from src.models.review import Review
+from utils.metrics import track_parsing
+from src.models import Review
 from src.utils.logger import get_logger
 from src.utils.validators import validate_non_empty_string
 

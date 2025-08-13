@@ -5,10 +5,8 @@ from urllib.parse import urljoin
 from botasaurus.browser import browser, Driver
 
 from .base_parser import BaseParser
-from src.utils.metrics import track_parsing
-from .models import ReviewData
-
-from src.models.review import Review
+from utils.metrics import track_parsing
+from src.models import Review
 
 from src.utils.logger import get_logger
 from src.utils.validators import validate_non_empty_string
@@ -124,26 +122,18 @@ class DromParser(BaseParser):
             if author_elem:
                 review.author = self.normalize_text(author_elem.get_text())
 
-            specs_elem = card.select(".css-1x4jntm") or card.select(".css-car-info")
+            specs_elem = card.select(".css-1x4jntm") or card.select(
+                '.css-car-info'
+            )
             if specs_elem:
-                specs_text = specs_elem.get_text()
-                review.year = self.extract_year(specs_text)
-                review.engine_volume = self.extract_engine_volume(specs_text)
-                review.mileage = self.extract_mileage(specs_text)
-                if "бензин" in specs_text.lower():
-                    review.fuel_type = "бензин"
-                elif "дизель" in specs_text.lower():
-                    review.fuel_type = "дизель"
-                elif "гибрид" in specs_text.lower():
-                    review.fuel_type = "гибрид"
-                if "автомат" in specs_text.lower() or "акпп" in specs_text.lower():
-                    review.transmission = "автомат"
-                elif "механик" in specs_text.lower() or "мкпп" in specs_text.lower():
-                    review.transmission = "механика"
-                elif "вариатор" in specs_text.lower():
-                    review.transmission = "вариатор"
+                fields = self.extract_common_fields(specs_elem.get_text())
+                for field, value in fields.items():
+                    if value:
+                        setattr(review, field, value)
 
-            content_elem = card.select(".css-1wdvlz0") or card.select(".review-preview")
+            content_elem = card.select(".css-1wdvlz0") or card.select(
+                '.review-preview'
+            )
             if content_elem:
                 review.content = self.normalize_text(content_elem.get_text())
 
@@ -151,10 +141,9 @@ class DromParser(BaseParser):
                 '[data-ftid="component_date"]'
             )
             if date_elem:
-                date_text = date_elem.get_text()
-                review.publish_date = self._parse_date(date_text)
+                review.publish_date = self._parse_date(date_elem.get_text())
 
             return review if review.url else None
         except Exception as e:
-            logger.error(f"Ошибка парсинга карточки отзыва Drom: {e}")
+            logger.error(f"Ошибка парсинга карточки отзыва: {e}")
             return None
