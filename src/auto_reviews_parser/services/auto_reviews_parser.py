@@ -26,6 +26,8 @@ from .queue_service import QueueService
 
 from ..utils.metrics import setup_metrics
 
+logger = logging.getLogger(__name__)
+
 # ==================== НАСТРОЙКИ ====================
 
 
@@ -235,7 +237,7 @@ class ReviewsDatabase:
             # Дублирующая запись
             return False
         except Exception as e:
-            logging.error(f"Ошибка сохранения отзыва: {e}")
+            logger.error(f"Ошибка сохранения отзыва: {e}")
             return False
 
     def get_reviews_count(self, brand: str = None, model: str = None) -> int:
@@ -485,11 +487,11 @@ class AutoReviewsParser:
             elif source == "drive2.ru":
                 reviews = self.drive2_parser.parse_brand_model_reviews(data)
             else:
-                logging.warning(f"Unknown source: {source}")
+                logger.warning(f"Unknown source: {source}")
                 return False
 
             if not reviews:
-                logging.warning(
+                logger.warning(
                     f"Parser returned no reviews for {brand} {model} on {source}"
                 )
                 self.mark_source_completed(brand, model, source, Config.PAGES_PER_SESSION, 0)
@@ -511,7 +513,7 @@ class AutoReviewsParser:
             return saved_count
 
         except Exception as e:
-            logging.error(f"Критическая ошибка парсинга {brand} {model} {source}: {e}")
+            logger.error(f"Критическая ошибка парсинга {brand} {model} {source}: {e}")
             return False
 
     def parse_multiple_sources(
@@ -534,7 +536,7 @@ class AutoReviewsParser:
             for brand, model, source in sources:
                 parser = self.parsers.get(source)
                 if parser is None:
-                    logging.warning(f"Unknown source: {source}")
+                    logger.warning(f"Unknown source: {source}")
                     parse_results.append(((brand, model, source), []))
                     continue
                 data = {
@@ -545,7 +547,7 @@ class AutoReviewsParser:
                 try:
                     reviews = parser.parse_brand_model_reviews(data)
                 except Exception:
-                    logging.error(
+                    logger.error(
                         f"Ошибка парсинга {brand} {model} {source}", exc_info=True
                     )
                     reviews = []
@@ -610,7 +612,7 @@ class AutoReviewsParser:
                     time.sleep(delay)
 
             except Exception as e:
-                logging.error(
+                logger.error(
                     f"Ошибка обработки источника {brand} {model} {source}: {e}"
                 )
                 sources_processed += 1
@@ -672,7 +674,7 @@ class AutoReviewsParser:
                 logger.info("\n👋 Парсинг остановлен пользователем")
                 break
             except Exception as e:
-                logging.error(f"Критическая ошибка в непрерывном парсинге: {e}")
+                logger.error(f"Критическая ошибка в непрерывном парсинге: {e}")
                 logger.error(f"❌ Критическая ошибка: {e}")
                 logger.info("⏳ Пауза 30 минут перед повтором...")
                 time.sleep(1800)  # 30 минут пауза при критической ошибке
