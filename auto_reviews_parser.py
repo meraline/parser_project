@@ -34,6 +34,7 @@ from botasaurus import bt
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 logger = get_logger(__name__)
 =======
 from src.database.base import Database
@@ -92,6 +93,11 @@ class Config:
         "audi": ["a3", "a4", "a6", "q3", "q5", "q7"],
         "lada": ["granta", "kalina", "priora", "vesta", "xray", "largus"],
     }
+=======
+from src.config.settings import TARGET_BRANDS, settings
+
+# ==================== SETTINGS ====================
+>>>>>>> origin/codex/create-settings.py-and-targets.yaml
 
 
 # ==================== METRICS ====================
@@ -213,7 +219,7 @@ class ReviewData:
 class ReviewsDatabase:
     """Управление базой данных отзывов"""
 
-    def __init__(self, db_path: str = Config.DB_PATH):
+    def __init__(self, db_path: str = settings.db_path):
         self.db_path = db_path
         self.init_database()
 
@@ -443,9 +449,13 @@ class AutoReviewsParser:
     """Главный класс парсера отзывов автомобилей"""
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     def __init__(self, db_path: str = Config.DB_PATH):
 <<<<<<< HEAD
         validate_non_empty_string(db_path, "db_path")
+=======
+    def __init__(self, db_path: str = settings.db_path):
+>>>>>>> origin/codex/create-settings.py-and-targets.yaml
         self.db = ReviewsDatabase(db_path)
 =======
         self.db = Database(db_path)
@@ -475,10 +485,34 @@ class AutoReviewsParser:
 <<<<<<< HEAD
     def initialize_sources_queue(self):
         """Инициализация очереди источников для парсинга"""
+<<<<<<< HEAD
         self.queue_repo.initialize(Config.TARGET_BRANDS)
+=======
+        conn = sqlite3.connect(self.db.db_path)
+        cursor = conn.cursor()
+
+        # Очищаем старую очередь
+        cursor.execute("DELETE FROM sources_queue")
+
+        # Добавляем все комбинации брендов и моделей
+        for brand, models in TARGET_BRANDS.items():
+            for model in models:
+                for source in ["drom.ru", "drive2.ru"]:
+                    cursor.execute(
+                        """
+                        INSERT INTO sources_queue (brand, model, source, priority)
+                        VALUES (?, ?, ?, ?)
+                    """,
+                        (brand, model, source, 1),
+                    )
+
+        conn.commit()
+        conn.close()
+
+>>>>>>> origin/codex/create-settings.py-and-targets.yaml
         total_sources = (
-            len(Config.TARGET_BRANDS)
-            * sum(len(models) for models in Config.TARGET_BRANDS.values())
+            len(TARGET_BRANDS)
+            * sum(len(models) for models in TARGET_BRANDS.values())
             * 2
         )
         print(f"✅ Инициализирована очередь из {total_sources} источников")
@@ -504,7 +538,7 @@ class AutoReviewsParser:
         print(f"\n🎯 Парсинг: {brand} {model} на {source}")
 
         reviews = []
-        data = {"brand": brand, "model": model, "max_pages": Config.PAGES_PER_SESSION}
+        data = {"brand": brand, "model": model, "max_pages": settings.pages_per_session}
 
         try:
             if source == "drom.ru":
@@ -554,6 +588,7 @@ class AutoReviewsParser:
             SOURCE_COUNTER.inc()
             print(f"  💾 Сохранено {saved_count} из {len(reviews)} отзывов")
 
+<<<<<<< HEAD
             # Отмечаем источник как завершенный только если есть сохраненные отзывы
             if saved_count:
                 if hasattr(self, "queue_service") and self.queue_service:
@@ -564,6 +599,12 @@ class AutoReviewsParser:
                     self.mark_source_completed(
                         brand, model, source, Config.PAGES_PER_SESSION, saved_count
                     )
+=======
+            # Отмечаем источник как завершенный
+            self.mark_source_completed(
+                brand, model, source, settings.pages_per_session, saved_count
+            )
+>>>>>>> origin/codex/create-settings.py-and-targets.yaml
 
 <<<<<<< HEAD
             return saved_count or False
@@ -615,8 +656,13 @@ class AutoReviewsParser:
             brand, model, source = source_info
 
             # Проверяем лимит отзывов для модели
+<<<<<<< HEAD
             current_count = self.review_repo.get_reviews_count(brand, model)
             if current_count >= Config.MAX_REVIEWS_PER_MODEL:
+=======
+            current_count = self.db.get_reviews_count(brand, model)
+            if current_count >= settings.max_reviews_per_model:
+>>>>>>> origin/codex/create-settings.py-and-targets.yaml
                 print(
                     f"  ⚠️ Лимит отзывов для {brand} {model} достигнут ({current_count})"
                 )
@@ -642,7 +688,7 @@ class AutoReviewsParser:
                 sources_processed += 1
 
                 # Увеличенная пауза при ошибке
-                time.sleep(Config.ERROR_DELAY)
+                time.sleep(settings.error_delay)
 
         # Статистика сессии
         session_duration = datetime.now() - session_start
@@ -711,7 +757,7 @@ class AutoReviewsParser:
 class ParserManager:
     """Менеджер для управления парсером"""
 
-    def __init__(self, db_path: str = Config.DB_PATH):
+    def __init__(self, db_path: str = settings.db_path):
         self.parser = AutoReviewsParser(db_path)
 
     def show_status(self):
