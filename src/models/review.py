@@ -5,7 +5,7 @@ import hashlib
 
 
 @dataclass
-class ReviewData:
+class Review:
     """Структура данных отзыва"""
 
     source: str  # drom.ru, drive2.ru
@@ -31,13 +31,16 @@ class ReviewData:
     views_count: Optional[int] = None
     likes_count: Optional[int] = None
     comments_count: Optional[int] = None
-    parsed_at: datetime = None
+    parsed_at: Optional[datetime] = None
     content_hash: str = ""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.parsed_at is None:
             self.parsed_at = datetime.now()
+        self.content_hash = self.generate_hash()
+
+    def generate_hash(self) -> str:
         content_for_hash = (
             f"{self.url}_{self.title}_{self.content[:100] if self.content else ''}"
         )
-        self.content_hash = hashlib.md5(content_for_hash.encode()).hexdigest()
+        return hashlib.md5(content_for_hash.encode()).hexdigest()

@@ -6,7 +6,7 @@ from urllib.parse import urljoin
 from botasaurus.browser import browser, Driver
 
 from .base_parser import BaseParser
-from .models import ReviewData
+from src.models.review import Review
 
 
 class Drive2Parser(BaseParser):
@@ -19,13 +19,13 @@ class Drive2Parser(BaseParser):
         max_retry=3,
         headless=True,
     )
-    def parse_brand_model_reviews(self, driver: Driver, data: Dict) -> List[ReviewData]:
+    def parse_brand_model_reviews(self, driver: Driver, data: Dict) -> List[Review]:
         """Парсинг отзывов для конкретной марки и модели"""
         brand = data["brand"]
         model = data["model"]
         max_pages = data.get("max_pages", 50)
 
-        reviews: List[ReviewData] = []
+        reviews: List[Review] = []
         for content_type in ["experience", "logbook"]:
             try:
                 type_reviews = self._parse_content_type(
@@ -42,9 +42,9 @@ class Drive2Parser(BaseParser):
 
     def _parse_content_type(
         self, driver: Driver, brand: str, model: str, content_type: str, max_pages: int
-    ) -> List[ReviewData]:
+    ) -> List[Review]:
         """Парсинг конкретного типа контента"""
-        reviews: List[ReviewData] = []
+        reviews: List[Review] = []
         if content_type == "experience":
             base_url = f"https://www.drive2.ru/experience/{brand}/{model}/"
             review_type = "review"
@@ -119,10 +119,10 @@ class Drive2Parser(BaseParser):
 
     def _parse_drive2_card(
         self, card, brand: str, model: str, review_type: str, base_url: str
-    ) -> Optional[ReviewData]:
+    ) -> Optional[Review]:
         """Парсинг одной карточки Drive2"""
         try:
-            review = ReviewData(
+            review = Review(
                 source="drive2.ru", type=review_type, brand=brand, model=model
             )
 

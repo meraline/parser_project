@@ -20,7 +20,7 @@ def load_db_module():
 
 
 db_module = load_db_module()
-ReviewData = db_module.ReviewData
+Review = db_module.Review
 ReviewsDatabase = db_module.ReviewsDatabase
 
 
@@ -38,7 +38,7 @@ def test_init_database_creates_tables(tmp_path):
 def test_insert_and_duplicate_review(tmp_path):
     db_path = tmp_path / "test.db"
     db = ReviewsDatabase(str(db_path))
-    review = ReviewData(
+    review = Review(
         source="drom.ru",
         type="review",
         brand="Toyota",

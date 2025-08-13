@@ -73,7 +73,7 @@ class Config:
 
 # ==================== МОДЕЛИ ДАННЫХ ====================
 
-from parsers import ReviewData
+from src.models.review import Review
 
 # ==================== БАЗА ДАННЫХ ====================
 
@@ -178,7 +178,7 @@ class ReviewsDatabase:
         conn.commit()
         conn.close()
 
-    def save_review(self, review: ReviewData) -> bool:
+    def save_review(self, review: Review) -> bool:
         """Сохранение отзыва в базу"""
         try:
             conn = sqlite3.connect(self.db_path)
@@ -429,18 +429,15 @@ class AutoReviewsParser:
 
         try:
             if source == "drom.ru":
-                # Вызываем метод с передачей экземпляра парсера через metadata
-                reviews = self.drom_parser.parse_brand_model_reviews(
-                    data, metadata=self.drom_parser
-                )
+                reviews = self.drom_parser.parse_brand_model_reviews(data)
             elif source == "drive2.ru":
-                # Вызываем метод с правильной сигнатурой
                 reviews = self.drive2_parser.parse_brand_model_reviews(data)
-            if reviews is None:
+
+            if not reviews:
                 logging.warning(
                     f"Parser returned no reviews for {brand} {model} on {source}"
                 )
-                reviews = []
+                return False
 
             # Сохраняем отзывы в базу
             saved_count = 0
@@ -455,11 +452,11 @@ class AutoReviewsParser:
                 brand, model, source, Config.PAGES_PER_SESSION, saved_count
             )
 
-            return saved_count
+            return saved_count if saved_count > 0 else False
 
         except Exception as e:
             logging.error(f"Критическая ошибка парсинга {brand} {model} {source}: {e}")
-            return 0
+            return False
 
     def run_parsing_session(
         self, max_sources: int = 10, session_duration_hours: int = 2

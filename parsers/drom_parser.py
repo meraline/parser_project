@@ -6,7 +6,7 @@ from urllib.parse import urljoin
 from botasaurus.browser import browser, Driver
 
 from .base_parser import BaseParser
-from .models import ReviewData
+from src.models.review import Review
 
 
 class DromParser(BaseParser):
@@ -19,13 +19,13 @@ class DromParser(BaseParser):
         max_retry=3,
         headless=True,
     )
-    def parse_brand_model_reviews(self, driver: Driver, data: Dict) -> List[ReviewData]:
+    def parse_brand_model_reviews(self, driver: Driver, data: Dict) -> List[Review]:
         """Парсинг отзывов для конкретной марки и модели"""
         brand = data["brand"]
         model = data["model"]
         max_pages = data.get("max_pages", 50)
 
-        reviews: List[ReviewData] = []
+        reviews: List[Review] = []
         base_url = f"https://www.drom.ru/reviews/{brand}/{model}/"
 
         try:
@@ -85,10 +85,10 @@ class DromParser(BaseParser):
 
     def _parse_review_card(
         self, card, brand: str, model: str, base_url: str
-    ) -> Optional[ReviewData]:
+    ) -> Optional[Review]:
         """Парсинг одной карточки отзыва"""
         try:
-            review = ReviewData(
+            review = Review(
                 source="drom.ru", type="review", brand=brand, model=model
             )
 
