@@ -13,6 +13,16 @@ python auto_reviews_parser.py init
 python auto_reviews_parser.py parse --sources 3
 ```
 
+## Health check
+
+To verify that the parser and database are reachable run the health check
+command. It returns a small JSON payload with overall status and a link to
+the Prometheus metrics endpoint.
+
+```bash
+python cli/main.py health
+```
+
 ## Prometheus metrics
 
 The parser exposes metrics using [`prometheus-client`](https://github.com/prometheus/client_python). By default metrics are available on `http://localhost:${PROMETHEUS_PORT}`.

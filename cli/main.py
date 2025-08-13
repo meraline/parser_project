@@ -8,6 +8,7 @@ work to :class:`ParserManager` from ``auto_reviews_parser``.
 from __future__ import annotations
 
 import argparse
+import json
 
 from dependency_injector import containers, providers
 
@@ -15,6 +16,7 @@ from auto_reviews_parser import AutoReviewsParser, ParserManager, ReviewsDatabas
 from parsers import DromParser, Drive2Parser
 from review_repository import ReviewRepository
 from settings import Settings
+from utils.health import health_check
 
 
 class Container(containers.DeclarativeContainer):
@@ -44,7 +46,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Парсер отзывов автомобилей")
     parser.add_argument(
         "command",
-        choices=["init", "parse", "continuous", "status", "export"],
+        choices=["init", "parse", "continuous", "status", "export", "health"],
         help="Команда для выполнения",
     )
     parser.add_argument(
@@ -73,6 +75,12 @@ def main() -> None:
     args = arg_parser.parse_args()
 
     container = Container()
+
+    if args.command == "health":
+        status = health_check(container.database())
+        print(json.dumps(status))
+        return
+
     manager = container.parser_manager()
 
     if args.command == "init":
