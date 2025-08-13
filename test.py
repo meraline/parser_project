@@ -1033,6 +1033,11 @@ class AutoReviewsParser:
             elif source == "drive2.ru":
                 # Вызываем метод с правильной сигнатурой
                 reviews = self.drive2_parser.parse_brand_model_reviews(data)
+            if reviews is None:
+                logging.warning(
+                    f"Parser returned no reviews for {brand} {model} on {source}"
+                )
+                reviews = []
 
             # Сохраняем отзывы в базу
             saved_count = 0
