@@ -14,12 +14,17 @@ from typing import Dict, List, Tuple
 from pathlib import Path
 import json
 
+from src.utils.logger import get_logger
+from src.utils.validators import validate_non_empty_string
+
+logger = get_logger(__name__)
+
 
 class ReviewsAnalyzer:
     """Анализатор собранных отзывов"""
 
     def __init__(self, db_path: str = "auto_reviews.db"):
-        self.db_path = db_path
+        self.db_path = validate_non_empty_string(db_path, "db_path")
         self.ensure_db_exists()
 
     def ensure_db_exists(self):
@@ -112,8 +117,7 @@ class ReviewsAnalyzer:
 
         with open(report_file, "w", encoding="utf-8") as f:
             f.write(html_content)
-
-        print(f"📊 Отчет сохранен: {report_file}")
+        logger.info(f"Отчет сохранен: {report_file}")
         return str(report_file)
 
     def _generate_html_report(self, stats: Dict) -> str:
