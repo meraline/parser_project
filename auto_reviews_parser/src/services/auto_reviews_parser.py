@@ -23,6 +23,8 @@ from botasaurus.soupify import soupify
 from botasaurus import bt
 from .parallel_parser import ParallelParserService
 
+from src.utils.metrics import setup_metrics
+
 # ==================== НАСТРОЙКИ ====================
 
 
@@ -367,6 +369,8 @@ class AutoReviewsParser:
         self.db = db or ReviewsDatabase(db_path)
         self.setup_logging()
         self.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        setup_metrics()
 
         # Инициализация парсеров
         self.drom_parser = drom_parser or DromParser(self.db)
