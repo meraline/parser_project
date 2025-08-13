@@ -8,6 +8,8 @@ work to :class:`ParserManager` from ``auto_reviews_parser``.
 from __future__ import annotations
 
 import argparse
+import signal
+import sys
 
 from dependency_injector import containers, providers
 
@@ -74,6 +76,26 @@ def main() -> None:
 
     container = Container()
     manager = container.parser_manager()
+
+    def shutdown_handler(signum, frame):
+        """Handle termination signals for graceful shutdown."""
+        print("\n🛑 Завершение работы по сигналу...")
+        try:
+            parser = getattr(manager, "parser", None)
+            if parser and hasattr(parser, "stop"):
+                parser.stop()
+            db = getattr(parser, "db", None)
+            close = getattr(db, "close", None)
+            if callable(close):
+                close()
+        finally:
+            try:
+                container.shutdown_resources()
+            finally:
+                sys.exit(0)
+
+    signal.signal(signal.SIGINT, shutdown_handler)
+    signal.signal(signal.SIGTERM, shutdown_handler)
 
     if args.command == "init":
         print("🚀 Инициализация парсера...")
