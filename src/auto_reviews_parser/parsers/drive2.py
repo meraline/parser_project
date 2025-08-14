@@ -1,11 +1,14 @@
 import re
-from typing import List
+from typing import List, Dict, Any
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
 from .base import BaseParser
-from .models import Review
+from ..models import Review
+from ..utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class Drive2Parser(BaseParser):
