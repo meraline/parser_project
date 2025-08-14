@@ -1,5 +1,8 @@
+import logging
 import re
-from typing import List, Dict, Any
+
+from typing import Any, Dict, List
+
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
@@ -9,6 +12,9 @@ from ..models import Review
 from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+logger = logging.getLogger(__name__)
 
 
 class Drive2Parser(BaseParser):
@@ -83,7 +89,7 @@ class Drive2Parser(BaseParser):
 
         return review
 
-    def parse_brand_model_reviews(self, data: Dict[str, Any]) -> List[Review]:
+    async def parse_brand_model_reviews(self, data: Dict[str, Any]) -> List[Review]:
         """Парсинг отзывов для конкретной марки и модели"""
         brand = data.get("brand", "")
         model = data.get("model", "")
@@ -91,8 +97,8 @@ class Drive2Parser(BaseParser):
 
         reviews = []
 
-        # URL для поиска отзывов на drom.ru
-        base_url = f"https://www.drom.ru/reviews/{brand}/{model}/"
+        # URL для поиска отзывов на drive2.ru
+        base_url = f"https://www.drive2.ru/cars/{brand}/{model}/reviews/"
 
         for page in range(1, max_pages + 1):
             try:
