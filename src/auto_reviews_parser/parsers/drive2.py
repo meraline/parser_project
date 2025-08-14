@@ -15,8 +15,8 @@ class Drive2Parser(BaseParser):
         soup = BeautifulSoup(html, "html.parser")
         reviews: List[Review] = []
 
-        cards_exp = soup.select('.c-car-card')
-        cards_log = soup.select('.c-post-card, .c-logbook-card')
+        cards_exp = soup.select(".c-car-card")
+        cards_log = soup.select(".c-post-card, .c-logbook-card")
 
         for card in cards_exp:
             reviews.append(self._parse_card(card, brand, model, "review"))
@@ -79,3 +79,43 @@ class Drive2Parser(BaseParser):
             review.publish_date = self.text_extractor.parse_date(date_elem.get_text())
 
         return review
+
+    def parse_brand_model_reviews(self, data: Dict[str, Any]) -> List[Review]:
+        """Парсинг отзывов для конкретной марки и модели"""
+        brand = data.get("brand", "")
+        model = data.get("model", "")
+        max_pages = data.get("max_pages", 10)
+
+        reviews = []
+
+        # URL для поиска отзывов на drom.ru
+        base_url = f"https://www.drom.ru/reviews/{brand}/{model}/"
+
+        for page in range(1, max_pages + 1):
+            try:
+                page_url = f"{base_url}?page={page}" if page > 1 else base_url
+
+                # Используем botasaurus для получения HTML
+                from botasaurus.request import request
+
+                response = request.get(
+                    page_url,
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    },
+                )
+
+                if response.status_code != 200:
+                    break
+
+                page_reviews = await self.parse_reviews(response.text, brand, model)
+                reviews.extend(page_reviews)
+
+                # Задержка между запросами
+                await self.random_delay(3, 7)
+
+            except Exception as e:
+                logger.error(f"Ошибка парсинга страницы {page}: {e}")
+                break
+
+        return reviews

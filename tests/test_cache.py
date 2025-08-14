@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 import types
 import logging
-
+import pytest
 import fakeredis
 import redis
 
@@ -11,6 +11,28 @@ sys.path.append(str(Path(__file__).resolve().parents[1] / "src"))
 
 # Create a minimal stub for AutoReviewsParser module required by ParserService
 dummy_module = types.ModuleType("auto_reviews_parser.services.auto_reviews_parser")
+
+
+class MockDatabase:
+    def get_parsing_stats(self):
+        return {
+            "total_reviews": 0,
+            "unique_brands": 0,
+            "unique_models": 0,
+            "by_source": {},
+            "by_type": {},
+        }
+
+
+class MockQueueService:
+    def get_queue_stats(self):
+        return {"pending": 1, "completed": 0}
+
+
+class MockParser:
+    def __init__(self, **kwargs):
+        self.db = MockDatabase()
+
 
 class _Config:
     DB_PATH = ":memory:"
@@ -30,10 +52,13 @@ class _ReviewsDatabase:
 class _ParserManager:
     def __init__(self, parser=None):
         self.parser = parser
+
     def reset_queue(self):
         pass
+
     def export_data(self, output_format="xlsx"):
         pass
+
     def show_status(self):
         pass
 

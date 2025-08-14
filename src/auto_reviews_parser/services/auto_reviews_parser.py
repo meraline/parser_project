@@ -26,6 +26,9 @@ from .queue_service import QueueService
 
 from ..utils.metrics import setup_metrics
 
+from ..models.review import Review
+from ..parsers import DromParser, Drive2Parser
+
 logger = logging.getLogger(__name__)
 
 # ==================== НАСТРОЙКИ ====================
@@ -339,8 +342,8 @@ class AutoReviewsParser:
         setup_metrics()
 
         # Инициализация парсеров
-        self.drom_parser = drom_parser or DromParser(self.db)
-        self.drive2_parser = drive2_parser or Drive2Parser(self.db)
+        self.drom_parser = drom_parser or DromParser()
+        self.drive2_parser = drive2_parser or Drive2Parser()
         self.parsers: Dict[str, Any] = {
             "drom.ru": self.drom_parser,
             "drive2.ru": self.drive2_parser,
@@ -494,7 +497,9 @@ class AutoReviewsParser:
                 logger.warning(
                     f"Parser returned no reviews for {brand} {model} on {source}"
                 )
-                self.mark_source_completed(brand, model, source, Config.PAGES_PER_SESSION, 0)
+                self.mark_source_completed(
+                    brand, model, source, Config.PAGES_PER_SESSION, 0
+                )
                 return 0
 
             # Сохраняем отзывы в базу

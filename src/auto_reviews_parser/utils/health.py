@@ -21,3 +21,19 @@ def health_check(db: ReviewsDatabase) -> dict:
 
     status = "ok" if db_ok else "error"
     return {"status": status, "database": db_ok, "metrics": METRICS_URL}
+
+
+def health_check():
+    """Health check для мониторинга"""
+    try:
+        container = Container()
+        db = container.database()
+        stats = db.get_parsing_stats()
+        return {
+            "status": "healthy",
+            "database": True,
+            "total_reviews": stats.get("total_reviews", 0),
+            "metrics_url": f"http://localhost:{os.getenv('PROMETHEUS_PORT', 8000)}/metrics",
+        }
+    except Exception as e:
+        return {"status": "unhealthy", "database": False, "error": str(e)}

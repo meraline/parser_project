@@ -36,8 +36,8 @@ class Container(containers.DeclarativeContainer):
     review_repository = providers.Singleton(ReviewRepository, db=database)
 
     # Parsers
-    drom_parser = providers.Factory(DromParser, db=database)
-    drive2_parser = providers.Factory(Drive2Parser, db=database)
+    drom_parser = providers.Factory(DromParser)
+    drive2_parser = providers.Factory(Drive2Parser)
 
     # Services
     auto_reviews_parser = providers.Factory(
@@ -125,4 +125,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
