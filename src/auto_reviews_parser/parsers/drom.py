@@ -1,5 +1,6 @@
+import asyncio
 import re
-from typing import List
+from typing import Any, Dict, List
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
@@ -61,7 +62,7 @@ class DromParser(BaseParser):
         await self.random_delay()
         return reviews
 
-    def parse_brand_model_reviews(self, data: Dict[str, Any]) -> List[Review]:
+    async def parse_brand_model_reviews(self, data: Dict[str, Any]) -> List[Review]:
         """Парсинг отзывов для конкретной марки и модели"""
         brand = data.get("brand", "")
         model = data.get("model", "")
@@ -79,7 +80,8 @@ class DromParser(BaseParser):
                 # Используем botasaurus для получения HTML
                 from botasaurus.request import request
 
-                response = request.get(
+                response = await asyncio.to_thread(
+                    request.get,
                     page_url,
                     headers={
                         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
