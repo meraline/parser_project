@@ -1,12 +1,17 @@
 import logging
 import re
+
 from typing import Any, Dict, List
+
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
 from .base import BaseParser
-from .models import Review
+from ..models import Review
+from ..utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 logger = logging.getLogger(__name__)
