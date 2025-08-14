@@ -1,17 +1,9 @@
-import asyncio
-import random
 import re
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
-
-class DelayManager:
-    """Utility to manage asynchronous delays."""
-
-    async def sleep(self, min_delay: float = 0.0, max_delay: float = 0.0) -> None:
-        delay = random.uniform(min_delay, max_delay) if max_delay >= min_delay else min_delay
-        await asyncio.sleep(delay)
+from ..utils.delay_manager import DelayManager
 
 
 class TextExtractor:
@@ -159,7 +151,10 @@ class BaseParser(ABC):
         self.text_extractor = text_extractor or TextExtractor()
 
     async def random_delay(self, min_delay: float = 0, max_delay: float = 0) -> None:
-        await self.delay_manager.sleep(min_delay, max_delay)
+        if min_delay or max_delay:
+            await DelayManager(min_delay=min_delay, max_delay=max_delay).wait()
+        else:
+            await self.delay_manager.wait()
 
     def extract_common_fields(self, text: str) -> Dict[str, Any]:
         normalized = self.text_extractor.normalize(text)
