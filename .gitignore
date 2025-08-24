@@ -63,3 +63,18 @@ Thumbs.db
 
 # Logs
 *.log
+# Virtual environments
+parser_env/
+venv/
+env/
+*.venv
+
+# Playwright browsers and drivers
+chrome-linux/
+firefox*/
+webkit*/
+ffmpeg*/
+**/playwright/driver/
+
+# Dependencies  
+node_modules/
