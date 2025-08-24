@@ -1,0 +1,142 @@
+import json
+import sys
+from pathlib import Path
+import types
+import logging
+import pytest
+import fakeredis
+import redis
+
+sys.path.append(str(Path(__file__).resolve().parents[1] / "src"))
+
+# Create a minimal stub for AutoReviewsParser module required by ParserService
+dummy_module = types.ModuleType("auto_reviews_parser.services.auto_reviews_parser")
+
+
+class MockDatabase:
+    def get_parsing_stats(self):
+        return {
+            "total_reviews": 0,
+            "unique_brands": 0,
+            "unique_models": 0,
+            "by_source": {},
+            "by_type": {},
+        }
+
+
+class MockQueueService:
+    def get_queue_stats(self):
+        return {"pending": 1, "completed": 0}
+
+
+class MockParser:
+    def __init__(self, **kwargs):
+        self.db = MockDatabase()
+
+
+class _Config:
+    DB_PATH = ":memory:"
+    TARGET_BRANDS = {}
+
+
+class _Parser:
+    def __init__(self, db_path, queue_service=None):
+        self.db = types.SimpleNamespace(get_parsing_stats=lambda: {})
+
+
+class _ReviewsDatabase:
+    def get_parsing_stats(self):
+        return {}
+
+
+class _ParserManager:
+    def __init__(self, parser=None):
+        self.parser = parser
+
+    def reset_queue(self):
+        pass
+
+    def export_data(self, output_format="xlsx"):
+        pass
+
+    def show_status(self):
+        pass
+
+
+dummy_module.Config = _Config
+dummy_module.AutoReviewsParser = _Parser
+dummy_module.ReviewsDatabase = _ReviewsDatabase
+dummy_module.ParserManager = _ParserManager
+sys.modules["auto_reviews_parser.services.auto_reviews_parser"] = dummy_module
+
+from auto_reviews_parser.utils.cache import RedisCache
+from auto_reviews_parser.services.parser_service import ParserService
+
+
+def _fake_from_url(url: str, decode_responses: bool = True):
+    return fakeredis.FakeRedis(decode_responses=decode_responses)
+
+
+def test_redis_cache_get_set(monkeypatch):
+    monkeypatch.setattr(redis, "from_url", _fake_from_url)
+    cache = RedisCache("redis://localhost:6379/0")
+
+    assert cache.get("key") is None
+    cache.set("key", "value")
+    assert cache.get("key") == "value"
+
+
+def test_parser_service_uses_cache(monkeypatch):
+    monkeypatch.setattr(redis, "from_url", _fake_from_url)
+    cache = RedisCache("redis://localhost:6379/0")
+    service = ParserService(cache=cache)
+
+    calls = {"count": 0}
+
+    def fake_stats():
+        calls["count"] += 1
+        return {
+            "total_reviews": 0,
+            "unique_brands": 0,
+            "unique_models": 0,
+            "by_source": {},
+            "by_type": {},
+        }
+
+    monkeypatch.setattr(service.parser.db, "get_parsing_stats", fake_stats)
+    monkeypatch.setattr(service.queue_service, "get_queue_stats", lambda: {})
+
+    # First call - cache miss
+    data1 = service.get_status_data()
+    assert calls["count"] == 1
+
+    # Second call - should hit cache
+    data2 = service.get_status_data()
+    assert calls["count"] == 1
+    assert data1 == data2
+
+
+def test_parser_service_show_status_logs(monkeypatch, caplog):
+    monkeypatch.setattr(redis, "from_url", _fake_from_url)
+    cache = RedisCache("redis://localhost:6379/0")
+    service = ParserService(cache=cache)
+
+    def fake_get_status_data():
+        return {
+            "stats": {
+                "total_reviews": 1,
+                "unique_brands": 1,
+                "unique_models": 1,
+                "by_source": {"src": 1},
+                "by_type": {"type": 1},
+            },
+            "queue_stats": {"pending": 1},
+        }
+
+    monkeypatch.setattr(service, "get_status_data", fake_get_status_data)
+
+    with caplog.at_level(logging.INFO):
+        service.show_status()
+
+    assert "СТАТУС БАЗЫ ДАННЫХ" in caplog.text
+    assert "СТАТУС ОЧЕРЕДИ" in caplog.text

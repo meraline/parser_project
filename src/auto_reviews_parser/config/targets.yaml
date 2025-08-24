@@ -1,0 +1,112 @@
+toyota:
+  - camry
+  - corolla
+  - rav4
+  - highlander
+  - prius
+  - land-cruiser
+volkswagen:
+  - polo
+  - golf
+  - passat
+  - tiguan
+  - touareg
+  - jetta
+nissan:
+  - qashqai
+  - x-trail
+  - almera
+  - teana
+  - murano
+  - pathfinder
+hyundai:
+  - solaris
+  - elantra
+  - tucson
+  - santa-fe
+  - creta
+  - sonata
+kia:
+  - rio
+  - cerato
+  - sportage
+  - sorento
+  - soul
+  - optima
+mazda:
+  - mazda3
+  - mazda6
+  - cx-5
+  - cx-3
+  - mx-5
+  - cx-9
+ford:
+  - focus
+  - fiesta
+  - mondeo
+  - kuga
+  - explorer
+  - ecosport
+chevrolet:
+  - cruze
+  - aveo
+  - captiva
+  - lacetti
+  - tahoe
+  - suburban
+skoda:
+  - octavia
+  - rapid
+  - fabia
+  - superb
+  - kodiaq
+  - karoq
+renault:
+  - logan
+  - sandero
+  - duster
+  - kaptur
+  - megane
+  - fluence
+mitsubishi:
+  - lancer
+  - outlander
+  - asx
+  - pajero
+  - eclipse-cross
+  - l200
+honda:
+  - civic
+  - accord
+  - cr-v
+  - pilot
+  - fit
+  - hr-v
+bmw:
+  - 3-series
+  - 5-series
+  - x3
+  - x5
+  - x1
+  - 1-series
+mercedes-benz:
+  - c-class
+  - e-class
+  - s-class
+  - glc
+  - gle
+  - gla
+audi:
+  - a3
+  - a4
+  - a6
+  - q3
+  - q5
+  - q7
+lada:
+  - granta
+  - kalina
+  - priora
+  - vesta
+  - xray
+  - largus
