@@ -27,4 +27,39 @@ Thumbs.db
 *.log
 
 # db
-*.db
+*.db# Virtual environments
+parser_env/
+venv/
+env/
+*.venv
+
+# Playwright browsers and drivers
+chrome-linux/
+firefox*/
+webkit*/
+ffmpeg*/
+**/playwright/driver/
+
+# Node modules (если используется)
+node_modules/
+
+# Build outputs
+dist/
+build/
+__pycache__/
+*.pyc
+
+# Environment variables
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
