@@ -65,3 +65,5 @@ tmp/
 temp/
 *.tmpchrome-linux/
 node_modules/
+chrome-linux/chrome-linux/
+node_modules/
