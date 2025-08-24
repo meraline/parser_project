@@ -142,10 +142,23 @@ class DromParser(BaseParser):
         }
 
         try:
-            # Извлекаем текст отзыва
+            # Извлекаем текст отзыва (основной отзыв)
             review_text = soup.find("div", {"itemprop": "reviewBody"})
             if review_text:
                 data["text"] = review_text.get_text(strip=True)
+            else:
+                # Для дополнений к отзывам используем другой селектор
+                editable_area = soup.find("div", class_="b-editable-area")
+                if editable_area:
+                    # Ищем текст внутри editable-area
+                    text_content = editable_area.get_text(strip=True)
+                    data["text"] = text_content
+
+                    # Определяем тип контента
+                    if "/reviews/" in url and url.count("/") >= 6:  # дополнение
+                        data["content_type"] = "addition"
+                    else:
+                        data["content_type"] = "review"
 
             # Извлекаем рейтинг отзыва (от пользователей)
             rating_elem = soup.find("span", {"data-rating-mark-avg": True})
@@ -167,6 +180,14 @@ class DromParser(BaseParser):
             author_elem = soup.find("span", {"itemprop": "name"})
             if author_elem:
                 data["author"] = author_elem.text.strip()
+            else:
+                # Для дополнений автор может быть в другом месте
+                title_elem = soup.find("title")
+                if title_elem:
+                    # Автор часто в заголовке дополнения
+                    title_text = title_elem.text.strip()
+                    if "Toyota Camry" in title_text:
+                        data["author"] = title_text
 
             # Извлекаем статистику
             stats = soup.find_all("span", class_="b-text-gray")
@@ -278,9 +299,14 @@ class DromParser(BaseParser):
                                 review_url
                             )
 
+                            # Определяем тип контента
+                            content_type = "review"
+                            if review_url.count("/") >= 6:  # дополнение к отзыву
+                                content_type = "addition"
+
                             review = Review(
                                 source="drom.ru",
-                                type="review",
+                                type=content_type,
                                 url=review_url,
                                 brand=review_brand,
                                 model=review_model,
@@ -293,11 +319,18 @@ class DromParser(BaseParser):
                             )
 
                             reviews.append(review)
-                            print(f"Парсим отзыв {len(reviews)}: {review_url}")
+                            content_label = (
+                                "дополнение" if content_type == "addition" else "отзыв"
+                            )
+                            print(
+                                f"Парсим {content_label} {len(reviews)}: {review_url}"
+                            )
+                            print(f"  Тип: {content_type}")
                             print(f"  Автор: {review.author}")
                             print(f"  Рейтинг: {structured_data.get('rating')}")
                             print(f"  Оценка владельца: {review.rating}")
                             print(f"  Просмотры: {review.views_count}")
+                            print(f"  Длина контента: {len(review.content)} символов")
 
                             # Показываем характеристики если есть
                             chars = structured_data.get("characteristics", {})
