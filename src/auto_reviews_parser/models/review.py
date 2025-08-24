@@ -23,10 +23,15 @@ class Review:
     cons: str = ""
     mileage: Optional[int] = None
     engine_volume: Optional[float] = None
+    engine_power: Optional[int] = None  # мощность в л.с.
     fuel_type: str = ""
+    fuel_consumption_city: Optional[float] = None  # л/100км
+    fuel_consumption_highway: Optional[float] = None  # л/100км
     transmission: str = ""
     body_type: str = ""
     drive_type: str = ""
+    steering_wheel: str = ""  # Левый/Правый
+    year_purchased: Optional[int] = None  # год приобретения
     publish_date: Optional[datetime] = None
     views_count: Optional[int] = None
     likes_count: Optional[int] = None

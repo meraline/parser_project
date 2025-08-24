@@ -38,10 +38,15 @@ class ReviewRepository:
                     cons TEXT,
                     mileage INTEGER,
                     engine_volume REAL,
+                    engine_power INTEGER,
                     fuel_type TEXT,
+                    fuel_consumption_city REAL,
+                    fuel_consumption_highway REAL,
                     transmission TEXT,
                     body_type TEXT,
                     drive_type TEXT,
+                    steering_wheel TEXT,
+                    year_purchased INTEGER,
                     publish_date DATETIME,
                     views_count INTEGER,
                     likes_count INTEGER,
@@ -92,10 +97,15 @@ class ReviewRepository:
             review.cons,
             review.mileage,
             review.engine_volume,
+            review.engine_power,
             review.fuel_type,
+            review.fuel_consumption_city,
+            review.fuel_consumption_highway,
             review.transmission,
             review.body_type,
             review.drive_type,
+            review.steering_wheel,
+            review.year_purchased,
             review.publish_date,
             review.views_count,
             review.likes_count,
@@ -121,12 +131,16 @@ class ReviewRepository:
                     INSERT OR IGNORE INTO reviews (
                         source, type, brand, model, generation, year,
                         url, title, content, author, rating, pros,
-                        cons, mileage, engine_volume, fuel_type,
-                        transmission, body_type, drive_type,
-                        publish_date, views_count, likes_count,
-                        comments_count, parsed_at, content_hash
+                        cons, mileage, engine_volume, engine_power,
+                        fuel_type, fuel_consumption_city, 
+                        fuel_consumption_highway, transmission, 
+                        body_type, drive_type, steering_wheel,
+                        year_purchased, publish_date, views_count, 
+                        likes_count, comments_count, parsed_at, 
+                        content_hash
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
-                             ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                             ?, ?, ?, ?)
                     """,
                     self._review_to_tuple(review),
                 )
@@ -157,12 +171,16 @@ class ReviewRepository:
                     INSERT OR IGNORE INTO reviews (
                         source, type, brand, model, generation, year,
                         url, title, content, author, rating, pros,
-                        cons, mileage, engine_volume, fuel_type,
-                        transmission, body_type, drive_type,
-                        publish_date, views_count, likes_count,
-                        comments_count, parsed_at, content_hash
+                        cons, mileage, engine_volume, engine_power,
+                        fuel_type, fuel_consumption_city, 
+                        fuel_consumption_highway, transmission, 
+                        body_type, drive_type, steering_wheel,
+                        year_purchased, publish_date, views_count, 
+                        likes_count, comments_count, parsed_at, 
+                        content_hash
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
-                             ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                             ?, ?, ?, ?)
                     """,
                     params,
                 )

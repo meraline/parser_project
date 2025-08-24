@@ -4,6 +4,7 @@ from typing import Dict, List, Optional, Tuple
 import logging
 import os
 import re
+import time
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 class DromParser(BaseParser):
     """Парсер для сайта Drom.ru."""
 
-    def __init__(self):
+    def __init__(self, gentle_mode=True):
         """Инициализация парсера."""
         super().__init__()
         self.base_url = "https://www.drom.ru"
@@ -32,6 +33,11 @@ class DromParser(BaseParser):
         self.chrome_path = os.path.join(
             os.path.dirname(__file__), "../../../chrome-linux/chrome"
         )
+
+        # Настройки щадящего режима
+        self.gentle_mode = gentle_mode
+        self.request_delay = 2.0 if gentle_mode else 0.5  # задержка между запросами
+        self.page_delay = 3.0 if gentle_mode else 1.0  # задержка между страницами
 
     def parse_reviews(self, brand: str, model: str) -> List[Review]:
         """Parse reviews for given brand and model.
@@ -287,6 +293,10 @@ class DromParser(BaseParser):
                             break
 
                         try:
+                            # Щадящая задержка между отзывами
+                            if self.gentle_mode:
+                                time.sleep(self.request_delay)
+
                             self._go_to_page(page, review_url)
                             content = page.content()
 
@@ -301,8 +311,121 @@ class DromParser(BaseParser):
 
                             # Определяем тип контента
                             content_type = "review"
-                            if review_url.count("/") >= 6:  # дополнение к отзыву
+                            # Дополнение имеет доп. сегмент в URL после основного ID
+                            url_parts = review_url.rstrip("/").split("/")
+                            # Дополнение: .../camry/ID/ADDITION_ID/
+                            # Основной: .../camry/ID/
+                            if len(url_parts) > 7:
                                 content_type = "addition"
+
+                            # Извлекаем характеристики из car_specs
+                            car_specs = structured_data.get("car_specs", {})
+                            characteristics = structured_data.get("characteristics", {})
+
+                            # Год выпуска
+                            year = None
+                            if "Год выпуска" in car_specs:
+                                try:
+                                    year = int(car_specs["Год выпуска"])
+                                except (ValueError, TypeError):
+                                    year = None
+
+                            # Объем двигателя
+                            engine_volume = None
+                            if "Объем двигателя" in car_specs:
+                                try:
+                                    engine_str = (
+                                        car_specs["Объем двигателя"]
+                                        .replace("л", "")
+                                        .strip()
+                                    )
+                                    engine_volume = float(engine_str)
+                                except (ValueError, TypeError):
+                                    engine_volume = None
+                            elif "Двигатель" in characteristics:
+                                # Извлекаем из "бензин, 2000 куб.см, 150 л.с."
+                                engine_info = characteristics["Двигатель"]
+                                if (
+                                    isinstance(engine_info, str)
+                                    and "куб.см" in engine_info
+                                ):
+                                    try:
+                                        parts = engine_info.split(", ")
+                                        for part in parts:
+                                            if "куб.см" in part:
+                                                volume_str = part.replace(
+                                                    "куб.см", ""
+                                                ).strip()
+                                                engine_volume = (
+                                                    float(volume_str) / 1000
+                                                )  # переводим в литры
+                                                break
+                                    except (ValueError, TypeError):
+                                        engine_volume = None
+
+                            # Мощность двигателя
+                            engine_power = None
+                            if "Двигатель" in characteristics:
+                                engine_info = characteristics["Двигатель"]
+                                if (
+                                    isinstance(engine_info, str)
+                                    and "л.с." in engine_info
+                                ):
+                                    try:
+                                        # Извлекаем "150 л.с." из "бензин, 2000 куб.см, 150 л.с."
+                                        parts = engine_info.split(", ")
+                                        for part in parts:
+                                            if "л.с." in part:
+                                                power_str = part.replace(
+                                                    "л.с.", ""
+                                                ).strip()
+                                                engine_power = int(power_str)
+                                                break
+                                    except (ValueError, TypeError):
+                                        engine_power = None
+
+                            # Расход топлива
+                            fuel_consumption_city = None
+                            if "Расход топлива по городу" in car_specs:
+                                try:
+                                    city_str = car_specs["Расход топлива по городу"]
+                                    city_str = city_str.replace("л/100км", "").strip()
+                                    fuel_consumption_city = float(city_str)
+                                except (ValueError, TypeError):
+                                    fuel_consumption_city = None
+
+                            fuel_consumption_highway = None
+                            if "Расход топлива по трассе" in car_specs:
+                                try:
+                                    highway_str = car_specs["Расход топлива по трассе"]
+                                    highway_str = highway_str.replace(
+                                        "л/100км", ""
+                                    ).strip()
+                                    fuel_consumption_highway = float(highway_str)
+                                except (ValueError, TypeError):
+                                    fuel_consumption_highway = None
+
+                            # Год приобретения
+                            year_purchased = None
+                            if "Год приобретения" in car_specs:
+                                try:
+                                    year_purchased = int(car_specs["Год приобретения"])
+                                except (ValueError, TypeError):
+                                    year_purchased = None
+
+                            # Пробег
+                            mileage = None
+                            if "Пробег" in car_specs:
+                                try:
+                                    mileage_str = (
+                                        car_specs["Пробег"]
+                                        .replace("км", "")
+                                        .replace(" ", "")
+                                        .strip()
+                                    )
+                                    mileage = int(mileage_str)
+                                except (ValueError, TypeError):
+                                    mileage = None
 
                             review = Review(
                                 source="drom.ru",
@@ -316,6 +439,19 @@ class DromParser(BaseParser):
                                 views_count=structured_data.get("views", 0),
                                 comments_count=structured_data.get("comments", 0),
                                 likes_count=structured_data.get("likes", 0),
+                                year=year,
+                                engine_volume=engine_volume,
+                                engine_power=engine_power,
+                                fuel_type=car_specs.get("Тип топлива", ""),
+                                fuel_consumption_city=fuel_consumption_city,
+                                fuel_consumption_highway=fuel_consumption_highway,
+                                transmission=car_specs.get("Трансмиссия", ""),
+                                body_type=car_specs.get("Тип кузова", ""),
+                                drive_type=car_specs.get("Привод", ""),
+                                steering_wheel=car_specs.get("Руль", ""),
+                                year_purchased=year_purchased,
+                                mileage=mileage,
+                                generation=car_specs.get("Поколение", ""),
                             )
 
                             reviews.append(review)
@@ -337,6 +473,11 @@ class DromParser(BaseParser):
                             if chars:
                                 print(f"  Характеристики: {chars}")
 
+                            # Показываем car_specs если есть
+                            car_specs = structured_data.get("car_specs", {})
+                            if car_specs:
+                                print(f"  Технические характеристики: {car_specs}")
+
                         except Exception as e:
                             print(f"Ошибка при парсинге {review_url}: {e}")
                             continue
@@ -354,6 +495,10 @@ class DromParser(BaseParser):
 
                     next_button.click()
                     page.wait_for_load_state("networkidle")
+
+                    # Щадящая задержка между страницами
+                    if self.gentle_mode:
+                        time.sleep(self.page_delay)
 
             finally:
                 browser.close()
@@ -432,6 +577,10 @@ class DromParser(BaseParser):
 
                     next_button.click()
                     page.wait_for_load_state("networkidle")
+
+                    # Щадящая задержка между страницами
+                    if self.gentle_mode:
+                        time.sleep(self.page_delay)
 
             finally:
                 browser.close()
