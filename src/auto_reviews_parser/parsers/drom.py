@@ -80,16 +80,33 @@ class DromParser(BaseParser):
                         type="review",
                         brand=review_data["brand"],
                         model=review_data["model"],
+                        generation=review_data.get("generation"),
                         url=url,
                         content=review_data["content"],
                         author=review_data["author"],
                         rating=review_data.get("rating"),
-                        # Новые поля для рейтингов
+                        # Технические характеристики
+                        year=review_data.get("year"),
+                        body_type=review_data.get("body_type", ""),
+                        transmission=review_data.get("transmission", ""),
+                        drive_type=review_data.get("drive_type", ""),
+                        steering_wheel=review_data.get("steering_wheel", ""),
+                        mileage=review_data.get("mileage"),
+                        engine_volume=review_data.get("engine_volume"),
+                        engine_power=review_data.get("engine_power"),
+                        fuel_type=review_data.get("fuel_type", ""),
+                        fuel_consumption_city=review_data.get("fuel_consumption_city"),
+                        fuel_consumption_highway=review_data.get(
+                            "fuel_consumption_highway"
+                        ),
+                        year_purchased=review_data.get("year_purchased"),
+                        # Рейтинги
                         overall_rating=review_data.get("owner_rating"),
                         exterior_rating=review_data.get("exterior_rating"),
                         interior_rating=review_data.get("interior_rating"),
                         engine_rating=review_data.get("engine_rating"),
                         driving_rating=review_data.get("driving_rating"),
+                        # Статистика
                         views_count=review_data.get("views", 0),
                     )
                     return [review]
@@ -232,6 +249,7 @@ class DromParser(BaseParser):
             "characteristics": {},
             "car_specs": {},
             "author": "",
+            "city": "",  # Добавляем поле для города
             "views": 0,
             "comments": 0,
             "likes": 0,
@@ -287,10 +305,51 @@ class DromParser(BaseParser):
             else:
                 print("    Общая оценка не найдена")
 
-            # Извлекаем автора
-            author_elem = soup.find("span", {"itemprop": "name"})
+            # Извлекаем автора и город
+            # Ищем реального автора по классу reviewer
+            author_elem = soup.find("span", class_="reviewer")
+            if not author_elem:
+                # Если не найден, пробуем по itemprop="name"
+                author_elem = soup.find("span", {"itemprop": "name"})
+
             if author_elem:
                 data["author"] = author_elem.text.strip()
+                print(f"    Найден автор: {data['author']}")
+
+                # Ищем город - поднимаемся по родителям до нахождения текста с запятой
+                current_elem = author_elem
+                city_found = False
+
+                # Проверяем несколько уровней родителей
+                for level in range(5):  # максимум 5 уровней вверх
+                    current_elem = current_elem.find_parent()
+                    if current_elem:
+                        parent_text = current_elem.get_text(separator=" ", strip=True)
+                        print(f"    Проверяем родителя: '{parent_text[:100]}...'")
+                        # Ищем паттерн "Автор, Город" или "Автор</span>, Город"
+                        if ", " in parent_text and data["author"] in parent_text:
+                            # Находим позицию автора и ищем после запятой
+                            after_author = parent_text.split(data["author"], 1)
+                            if len(after_author) > 1:
+                                remaining_text = after_author[1].strip()
+                                if remaining_text.startswith(", "):
+                                    # Убираем запятую и пробелы
+                                    potential_city = remaining_text[2:].strip()
+                                    # Берем только первое слово до следующего пробела
+                                    city_parts = potential_city.split()
+                                    if city_parts:
+                                        city = city_parts[0]
+                                        # Проверяем, что это не число и не служебный текст
+                                        if not city.isdigit() and len(city) > 1:
+                                            data["city"] = city
+                                            print(f"    Найден город: {city}")
+                                            city_found = True
+                                            break
+                    else:
+                        break
+
+                if not city_found:
+                    print("    Город не найден")
             else:
                 # Для дополнений автор может быть в другом месте
                 title_elem = soup.find("title")
@@ -362,6 +421,103 @@ class DromParser(BaseParser):
 
         except Exception as e:
             logger.error(f"Ошибка при извлечении данных из {url}: {e}")
+
+        # Маппинг технических характеристик в поля модели
+        car_specs = data.get("car_specs", {})
+
+        # Год выпуска
+        if "Год выпуска" in car_specs:
+            try:
+                data["year"] = int(car_specs["Год выпуска"])
+            except (ValueError, TypeError):
+                pass
+
+        # Поколение
+        if "Поколение" in car_specs:
+            data["generation"] = car_specs["Поколение"]
+
+        # Тип кузова
+        if "Тип кузова" in car_specs:
+            data["body_type"] = car_specs["Тип кузова"]
+
+        # Трансмиссия
+        if "Трансмиссия" in car_specs:
+            data["transmission"] = car_specs["Трансмиссия"]
+
+        # Привод
+        if "Привод" in car_specs:
+            data["drive_type"] = car_specs["Привод"]
+
+        # Руль
+        if "Руль" in car_specs:
+            data["steering_wheel"] = car_specs["Руль"]
+
+        # Пробег
+        if "Пробег" in car_specs:
+            try:
+                pробег_str = (
+                    car_specs["Пробег"].replace("км", "").replace(" ", "").strip()
+                )
+                data["mileage"] = int(pробег_str)
+            except (ValueError, TypeError):
+                pass
+
+        # Двигатель - парсим "бензин, 2500 куб.см, 181 л.с."
+        if "Двигатель" in car_specs:
+            engine_info = car_specs["Двигатель"]
+            if isinstance(engine_info, str):
+                parts = [p.strip() for p in engine_info.split(",")]
+
+                # Тип топлива (первая часть)
+                if len(parts) >= 1:
+                    data["fuel_type"] = parts[0]
+
+                # Объем двигателя (вторая часть)
+                if len(parts) >= 2:
+                    volume_part = parts[1]
+                    if "куб.см" in volume_part:
+                        try:
+                            volume_str = volume_part.replace("куб.см", "").strip()
+                            # Переводим в литры (2500 куб.см = 2.5л)
+                            data["engine_volume"] = float(volume_str) / 1000
+                        except (ValueError, TypeError):
+                            pass
+
+                # Мощность (третья часть)
+                if len(parts) >= 3:
+                    power_part = parts[2]
+                    if "л.с." in power_part:
+                        try:
+                            power_str = power_part.replace("л.с.", "").strip()
+                            data["engine_power"] = int(power_str)
+                        except (ValueError, TypeError):
+                            pass
+
+        # Расход топлива
+        if "Расход топлива по городу" in car_specs:
+            try:
+                city_str = (
+                    car_specs["Расход топлива по городу"].replace("л/100км", "").strip()
+                )
+                data["fuel_consumption_city"] = float(city_str)
+            except (ValueError, TypeError):
+                pass
+
+        if "Расход топлива по трассе" in car_specs:
+            try:
+                highway_str = (
+                    car_specs["Расход топлива по трассе"].replace("л/100км", "").strip()
+                )
+                data["fuel_consumption_highway"] = float(highway_str)
+            except (ValueError, TypeError):
+                pass
+
+        # Год приобретения
+        if "Год приобретения" in car_specs:
+            try:
+                data["year_purchased"] = int(car_specs["Год приобретения"])
+            except (ValueError, TypeError):
+                pass
 
         return data
 
@@ -587,19 +743,25 @@ class DromParser(BaseParser):
                                 views_count=structured_data.get("views", 0),
                                 comments_count=structured_data.get("comments", 0),
                                 likes_count=structured_data.get("likes", 0),
-                                year=year,
-                                engine_volume=engine_volume,
-                                engine_power=engine_power,
-                                fuel_type=car_specs.get("Тип топлива", ""),
-                                fuel_consumption_city=fuel_consumption_city,
-                                fuel_consumption_highway=fuel_consumption_highway,
-                                transmission=car_specs.get("Трансмиссия", ""),
-                                body_type=car_specs.get("Тип кузова", ""),
-                                drive_type=car_specs.get("Привод", ""),
-                                steering_wheel=car_specs.get("Руль", ""),
-                                year_purchased=year_purchased,
-                                mileage=mileage,
-                                generation=car_specs.get("Поколение", ""),
+                                year=structured_data.get("year"),
+                                engine_volume=structured_data.get("engine_volume"),
+                                engine_power=structured_data.get("engine_power"),
+                                fuel_type=structured_data.get("fuel_type", ""),
+                                fuel_consumption_city=structured_data.get(
+                                    "fuel_consumption_city"
+                                ),
+                                fuel_consumption_highway=structured_data.get(
+                                    "fuel_consumption_highway"
+                                ),
+                                transmission=structured_data.get("transmission", ""),
+                                body_type=structured_data.get("body_type", ""),
+                                drive_type=structured_data.get("drive_type", ""),
+                                steering_wheel=structured_data.get(
+                                    "steering_wheel", ""
+                                ),
+                                year_purchased=structured_data.get("year_purchased"),
+                                mileage=structured_data.get("mileage"),
+                                generation=structured_data.get("generation", ""),
                             )
 
                             reviews.append(review)

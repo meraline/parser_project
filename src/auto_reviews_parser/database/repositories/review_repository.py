@@ -23,64 +23,64 @@ class ReviewRepository:
                 """
                 CREATE TABLE IF NOT EXISTS reviews (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    source TEXT NOT NULL,
-                    type TEXT NOT NULL,
-                    brand TEXT NOT NULL,
-                    model TEXT NOT NULL,
-                    generation TEXT,
-                    year INTEGER,
-                    url TEXT UNIQUE,
-                    title TEXT,
-                    content TEXT,
-                    author TEXT,
-                    rating REAL,
-                    overall_rating REAL,
-                    exterior_rating INTEGER,
-                    interior_rating INTEGER,
-                    engine_rating INTEGER,
-                    driving_rating INTEGER,
-                    pros TEXT,
-                    cons TEXT,
-                    mileage INTEGER,
-                    engine_volume REAL,
-                    engine_power INTEGER,
-                    fuel_type TEXT,
-                    fuel_consumption_city REAL,
-                    fuel_consumption_highway REAL,
-                    transmission TEXT,
-                    body_type TEXT,
-                    drive_type TEXT,
-                    steering_wheel TEXT,
-                    year_purchased INTEGER,
-                    publish_date DATETIME,
-                    views_count INTEGER,
-                    likes_count INTEGER,
-                    comments_count INTEGER,
-                    parsed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    content_hash TEXT UNIQUE,
-                    UNIQUE(url, content_hash)
+                    источник TEXT NOT NULL,
+                    тип TEXT NOT NULL,
+                    марка TEXT NOT NULL,
+                    модель TEXT NOT NULL,
+                    поколение TEXT,
+                    год_выпуска INTEGER,
+                    ссылка TEXT UNIQUE,
+                    заголовок TEXT,
+                    содержание TEXT,
+                    автор TEXT,
+                    рейтинг REAL,
+                    общая_оценка REAL,
+                    оценка_внешнего_вида INTEGER,
+                    оценка_салона INTEGER,
+                    оценка_двигателя INTEGER,
+                    оценка_ходовых_качеств INTEGER,
+                    плюсы TEXT,
+                    минусы TEXT,
+                    пробег INTEGER,
+                    объем_двигателя REAL,
+                    мощность_двигателя INTEGER,
+                    тип_топлива TEXT,
+                    расход_в_городе REAL,
+                    расход_на_трассе REAL,
+                    трансмиссия TEXT,
+                    тип_кузова TEXT,
+                    тип_привода TEXT,
+                    руль TEXT,
+                    год_приобретения INTEGER,
+                    дата_публикации DATETIME,
+                    количество_просмотров INTEGER,
+                    количество_лайков INTEGER,
+                    количество_комментариев INTEGER,
+                    дата_парсинга DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    хеш_содержания TEXT UNIQUE,
+                    UNIQUE(ссылка, хеш_содержания)
                 )
                 """
             )
             cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_brand_model ON reviews(brand, model)"
+                "CREATE INDEX IF NOT EXISTS idx_brand_model ON reviews(марка, модель)"
             )
             cursor.execute(
                 """
                 CREATE INDEX IF NOT EXISTS 
-                idx_source_type ON reviews(source, type)
-                """
-            )
-            cursor.execute(
-                """
-                CREATE INDEX IF NOT EXISTS 
-                idx_parsed_at ON reviews(parsed_at)
+                idx_source_type ON reviews(источник, тип)
                 """
             )
             cursor.execute(
                 """
                 CREATE INDEX IF NOT EXISTS 
-                idx_content_hash ON reviews(content_hash)
+                idx_parsed_at ON reviews(дата_парсинга)
+                """
+            )
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS 
+                idx_content_hash ON reviews(хеш_содержания)
                 """
             )
 
@@ -139,17 +139,17 @@ class ReviewRepository:
                 cursor.execute(
                     """
                     INSERT OR IGNORE INTO reviews (
-                        source, type, brand, model, generation, year,
-                        url, title, content, author, rating,
-                        overall_rating, exterior_rating, interior_rating,
-                        engine_rating, driving_rating, pros,
-                        cons, mileage, engine_volume, engine_power,
-                        fuel_type, fuel_consumption_city,
-                        fuel_consumption_highway, transmission,
-                        body_type, drive_type, steering_wheel,
-                        year_purchased, publish_date, views_count,
-                        likes_count, comments_count, parsed_at,
-                        content_hash
+                        источник, тип, марка, модель, поколение, год_выпуска,
+                        ссылка, заголовок, содержание, автор, рейтинг,
+                        общая_оценка, оценка_внешнего_вида, оценка_салона,
+                        оценка_двигателя, оценка_ходовых_качеств, плюсы,
+                        минусы, пробег, объем_двигателя, мощность_двигателя,
+                        тип_топлива, расход_в_городе,
+                        расход_на_трассе, трансмиссия,
+                        тип_кузова, тип_привода, руль,
+                        год_приобретения, дата_публикации, количество_просмотров,
+                        количество_лайков, количество_комментариев, дата_парсинга,
+                        хеш_содержания
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                              ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                              ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -181,17 +181,17 @@ class ReviewRepository:
                 cursor.executemany(
                     """
                     INSERT OR IGNORE INTO reviews (
-                        source, type, brand, model, generation, year,
-                        url, title, content, author, rating,
-                        overall_rating, exterior_rating, interior_rating,
-                        engine_rating, driving_rating, pros,
-                        cons, mileage, engine_volume, engine_power,
-                        fuel_type, fuel_consumption_city,
-                        fuel_consumption_highway, transmission,
-                        body_type, drive_type, steering_wheel,
-                        year_purchased, publish_date, views_count,
-                        likes_count, comments_count, parsed_at,
-                        content_hash
+                        источник, тип, марка, модель, поколение, год_выпуска,
+                        ссылка, заголовок, содержание, автор, рейтинг,
+                        общая_оценка, оценка_внешнего_вида, оценка_салона,
+                        оценка_двигателя, оценка_ходовых_качеств, плюсы,
+                        минусы, пробег, объем_двигателя, мощность_двигателя,
+                        тип_топлива, расход_в_городе,
+                        расход_на_трассе, трансмиссия,
+                        тип_кузова, тип_привода, руль,
+                        год_приобретения, дата_публикации, количество_просмотров,
+                        количество_лайков, количество_комментариев, дата_парсинга,
+                        хеш_содержания
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                              ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                              ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -222,19 +222,19 @@ class ReviewRepository:
                 total = cursor.fetchone()[0]
 
                 # Уникальные марки
-                cursor.execute("SELECT COUNT(DISTINCT brand) FROM reviews")
+                cursor.execute("SELECT COUNT(DISTINCT марка) FROM reviews")
                 brands = cursor.fetchone()[0]
 
                 # Уникальные модели
-                cursor.execute("SELECT COUNT(DISTINCT model) FROM reviews")
+                cursor.execute("SELECT COUNT(DISTINCT модель) FROM reviews")
                 models = cursor.fetchone()[0]
 
                 # Распределение по источникам
                 cursor.execute(
                     """
-                    SELECT source, COUNT(*) as count 
+                    SELECT источник, COUNT(*) as count 
                     FROM reviews 
-                    GROUP BY source
+                    GROUP BY источник
                     """
                 )
                 by_source = dict(cursor.fetchall())
@@ -284,15 +284,15 @@ class ReviewRepository:
                 query = """
                     SELECT COUNT(*)
                     FROM reviews
-                    WHERE brand = ?
-                    AND model = ?
+                    WHERE марка = ?
+                    AND модель = ?
                 """
                 cursor.execute(query, (brand, model))
             elif brand:
                 query = """
                     SELECT COUNT(*)
                     FROM reviews
-                    WHERE brand = ?
+                    WHERE марка = ?
                 """
                 cursor.execute(query, (brand,))
             else:
@@ -313,7 +313,7 @@ class ReviewRepository:
             query = """
                 SELECT 1
                 FROM reviews
-                WHERE url = ?
+                WHERE ссылка = ?
                 LIMIT 1
             """
             cursor.execute(query, (url,))
@@ -333,19 +333,19 @@ class ReviewRepository:
             total_reviews = cursor.fetchone()[0]
 
             # Уникальные бренды
-            cursor.execute("SELECT COUNT(DISTINCT brand) FROM reviews")
+            cursor.execute("SELECT COUNT(DISTINCT марка) FROM reviews")
             unique_brands = cursor.fetchone()[0]
 
             # Уникальные модели
-            cursor.execute("SELECT COUNT(DISTINCT model) FROM reviews")
+            cursor.execute("SELECT COUNT(DISTINCT модель) FROM reviews")
             unique_models = cursor.fetchone()[0]
 
             # Группировка по источникам
             cursor.execute(
                 """
-                SELECT source, COUNT(*)
+                SELECT источник, COUNT(*)
                 FROM reviews
-                GROUP BY source
+                GROUP BY источник
                 """
             )
             by_source = dict(cursor.fetchall())
@@ -353,9 +353,9 @@ class ReviewRepository:
             # Группировка по типам
             cursor.execute(
                 """
-                SELECT type, COUNT(*)
+                SELECT тип, COUNT(*)
                 FROM reviews
-                GROUP BY type
+                GROUP BY тип
                 """
             )
             by_type = dict(cursor.fetchall())
