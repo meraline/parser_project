@@ -23,7 +23,11 @@ from typing import Dict, List, Optional, Any
 from urllib.parse import urlparse
 
 # Добавляем корневую папку в путь для импорта
-project_root = Path(__file__).parent.parent.parent
+try:
+    project_root = Path(__file__).parent.parent.parent
+except NameError:
+    # Если __file__ не определен (exec), используем текущую директорию
+    project_root = Path.cwd()
 sys.path.insert(0, str(project_root))
 
 from src.auto_reviews_parser.parsers.drom import DromParser
@@ -32,7 +36,7 @@ from src.auto_reviews_parser.parsers.drom import DromParser
 class ImprovedRussianParser:
     """Исправленный максимально полный парсер с автосохранением."""
 
-    def __init__(self, db_path="data/databases/полные_отзывы_v2.db"):
+    def __init__(self, db_path="data/databases/нормализованная_бд_v3.db"):
         """Инициализация парсера."""
         self.db_path = Path(project_root) / db_path
         self.db_path.parent.mkdir(parents=True, exist_ok=True)

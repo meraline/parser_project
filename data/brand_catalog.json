@@ -1,0 +1,139 @@
+{
+  "extraction_date": "2025-08-25T19:56:25.046387",
+  "total_brands": 19,
+  "brands": {
+    "audi": {
+      "name": "Audi",
+      "slug": "audi",
+      "url": "https://www.drom.ru/reviews/audi/",
+      "review_count": 12554,
+      "models": []
+    },
+    "bmw": {
+      "name": "BMW",
+      "slug": "bmw",
+      "url": "https://www.drom.ru/reviews/bmw/",
+      "review_count": 18001,
+      "models": []
+    },
+    "chevrolet": {
+      "name": "Chevrolet",
+      "slug": "chevrolet",
+      "url": "https://www.drom.ru/reviews/chevrolet/",
+      "review_count": 28421,
+      "models": []
+    },
+    "ford": {
+      "name": "Ford",
+      "slug": "ford",
+      "url": "https://www.drom.ru/reviews/ford/",
+      "review_count": 29542,
+      "models": []
+    },
+    "honda": {
+      "name": "Honda",
+      "slug": "honda",
+      "url": "https://www.drom.ru/reviews/honda/",
+      "review_count": 85548,
+      "models": []
+    },
+    "hyundai": {
+      "name": "Hyundai",
+      "slug": "hyundai",
+      "url": "https://www.drom.ru/reviews/hyundai/",
+      "review_count": 38613,
+      "models": []
+    },
+    "kia": {
+      "name": "Kia",
+      "slug": "kia",
+      "url": "https://www.drom.ru/reviews/kia/",
+      "review_count": 33968,
+      "models": []
+    },
+    "lexus": {
+      "name": "Lexus",
+      "slug": "lexus",
+      "url": "https://www.drom.ru/reviews/lexus/",
+      "review_count": 14914,
+      "models": []
+    },
+    "mazda": {
+      "name": "Mazda",
+      "slug": "mazda",
+      "url": "https://www.drom.ru/reviews/mazda/",
+      "review_count": 44052,
+      "models": []
+    },
+    "mercedes-benz": {
+      "name": "Mercedes-Benz",
+      "slug": "mercedes-benz",
+      "url": "https://www.drom.ru/reviews/mercedes-benz/",
+      "review_count": 17438,
+      "models": []
+    },
+    "mitsubishi": {
+      "name": "Mitsubishi",
+      "slug": "mitsubishi",
+      "url": "https://www.drom.ru/reviews/mitsubishi/",
+      "review_count": 51413,
+      "models": []
+    },
+    "nissan": {
+      "name": "Nissan",
+      "slug": "nissan",
+      "url": "https://www.drom.ru/reviews/nissan/",
+      "review_count": 117359,
+      "models": []
+    },
+    "opel": {
+      "name": "Opel",
+      "slug": "opel",
+      "url": "https://www.drom.ru/reviews/opel/",
+      "review_count": 16148,
+      "models": []
+    },
+    "renault": {
+      "name": "Renault",
+      "slug": "renault",
+      "url": "https://www.drom.ru/reviews/renault/",
+      "review_count": 20276,
+      "models": []
+    },
+    "subaru": {
+      "name": "Subaru",
+      "slug": "subaru",
+      "url": "https://www.drom.ru/reviews/subaru/",
+      "review_count": 28911,
+      "models": []
+    },
+    "suzuki": {
+      "name": "Suzuki",
+      "slug": "suzuki",
+      "url": "https://www.drom.ru/reviews/suzuki/",
+      "review_count": 20596,
+      "models": []
+    },
+    "toyota": {
+      "name": "Toyota",
+      "slug": "toyota",
+      "url": "https://www.drom.ru/reviews/toyota/",
+      "review_count": 282196,
+      "models": []
+    },
+    "volkswagen": {
+      "name": "Volkswagen",
+      "slug": "volkswagen",
+      "url": "https://www.drom.ru/reviews/volkswagen/",
+      "review_count": 27627,
+      "models": []
+    },
+    "lada": {
+      "name": "Лада",
+      "slug": "lada",
+      "url": "https://www.drom.ru/reviews/lada/",
+      "review_count": 115311,
+      "models": []
+    }
+  }
+}
