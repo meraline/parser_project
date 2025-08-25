@@ -1063,3 +1063,103 @@ class DromParser(BaseParser):
             logger.error(f"Ошибка извлечения данных комментария: {e}")
 
         return data
+
+    def get_all_models_for_brand(self, brand: str) -> List[str]:
+        """Получить все модели для указанного бренда.
+
+        Args:
+            brand: Название бренда (URL-имя на drom.ru)
+
+        Returns:
+            Список названий моделей
+
+        Raises:
+            NetworkError: При сетевых ошибках
+            ParseError: При ошибках парсинга
+        """
+        models = []
+
+        # URL страницы бренда
+        brand_url = f"{self.base_url}/reviews/{brand.lower()}/"
+
+        with sync_playwright() as p:
+            # Используем локальный браузер если он доступен
+            if os.path.exists(self.chrome_path):
+                browser = p.chromium.launch(
+                    executable_path=self.chrome_path, headless=True
+                )
+            else:
+                browser = p.chromium.launch(headless=True)
+
+            page = browser.new_page()
+
+            try:
+                logger.info(f"Получаем модели для бренда {brand} с {brand_url}")
+                self._go_to_page(page, brand_url)
+
+                # Ждем загрузки страницы
+                page.wait_for_timeout(self.page_delay * 1000)
+
+                # Получаем содержимое страницы
+                html_content = page.content()
+                soup = BeautifulSoup(html_content, "html.parser")
+
+                # Ищем ссылки на модели
+                # Формат: /reviews/{brand}/{model}/
+                pattern = rf"/reviews/{re.escape(brand.lower())}/[^/]+/$"
+                model_links = soup.find_all("a", href=re.compile(pattern))
+
+                for link in model_links:
+                    href = link.get("href")
+                    if href and isinstance(href, str):
+                        # Извлекаем название модели из URL
+                        # Формат: /reviews/{brand}/{model}/
+                        parts = href.strip("/").split("/")
+                        if (
+                            len(parts) >= 3
+                            and parts[0] == "reviews"
+                            and parts[1] == brand.lower()
+                        ):
+                            model = parts[2]
+                            # Заменяем подчеркивания и дефисы на пробелы
+                            model_name = model.replace("_", " ")
+                            model_name = model_name.replace("-", " ")
+                            if model_name not in models:
+                                models.append(model_name)
+
+                # Если не нашли модели, попробуем альтернативный способ
+                if not models:
+                    # Ищем любые ссылки, содержащие название бренда
+                    all_links = soup.find_all("a", href=True)
+                    for link in all_links:
+                        href = link.get("href")
+                        if href and isinstance(href, str):
+                            if f"/reviews/{brand.lower()}/" in href:
+                                # Проверяем, что это ссылка на модель
+                                if href.count("/") >= 4:
+                                    parts = href.strip("/").split("/")
+                                    if len(parts) >= 3:
+                                        model = parts[2]
+                                        model_name = model.replace("_", " ")
+                                        model_name = model_name.replace("-", " ")
+                                        if (
+                                            model_name not in models
+                                            and model_name != brand.lower()
+                                        ):
+                                            models.append(model_name)
+
+                logger.info(f"Найдено {len(models)} моделей для бренда {brand}")
+
+                if models:
+                    # Показываем только первые 10 для отладки
+                    logger.debug(f"Модели {brand}: {models[:10]}...")
+                else:
+                    logger.warning(f"Не удалось найти модели для бренда {brand}")
+
+            except Exception as e:
+                logger.error(f"Ошибка при получении моделей для бренда {brand}: {e}")
+                raise
+            finally:
+                browser.close()
+
+        return sorted(models)  # Возвращаем отсортированный список
