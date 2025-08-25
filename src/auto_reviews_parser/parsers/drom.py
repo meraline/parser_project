@@ -39,6 +39,70 @@ class DromParser(BaseParser):
         self.request_delay = 2.0 if gentle_mode else 0.5  # задержка между запросами
         self.page_delay = 3.0 if gentle_mode else 1.0  # задержка между страницами
 
+    def parse_single_review(self, url: str) -> List[Review]:
+        """Парсит один отзыв по прямому URL.
+
+        Args:
+            url: URL конкретного отзыва
+
+        Returns:
+            Список с одним отзывом или пустой список
+        """
+        if not self._is_review_url(url):
+            print(f"❌ URL не является ссылкой на отзыв: {url}")
+            return []
+
+        with sync_playwright() as p:
+            # Используем локальный браузер если он доступен
+            if os.path.exists(self.chrome_path):
+                browser = p.chromium.launch(
+                    executable_path=self.chrome_path, headless=True
+                )
+            else:
+                browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+
+            try:
+                self._go_to_page(page, url)
+
+                # Разворачиваем скрытые блоки
+                self._expand_hidden_blocks(page)
+
+                # Получаем HTML после всех манипуляций
+                html_content = page.content()
+
+                # Извлекаем данные отзыва
+                review_data = self._extract_review_data(html_content, url)
+
+                if review_data["type"] == "review":
+                    review = Review(
+                        source="drom.ru",
+                        type="review",
+                        brand=review_data["brand"],
+                        model=review_data["model"],
+                        url=url,
+                        content=review_data["content"],
+                        author=review_data["author"],
+                        rating=review_data.get("rating"),
+                        # Новые поля для рейтингов
+                        overall_rating=review_data.get("owner_rating"),
+                        exterior_rating=review_data.get("exterior_rating"),
+                        interior_rating=review_data.get("interior_rating"),
+                        engine_rating=review_data.get("engine_rating"),
+                        driving_rating=review_data.get("driving_rating"),
+                        views_count=review_data.get("views", 0),
+                    )
+                    return [review]
+                else:
+                    print(f"❌ URL не содержит отзыв: {url}")
+                    return []
+
+            except Exception as e:
+                print(f"❌ Ошибка при парсинге отзыва {url}: {e}")
+                return []
+            finally:
+                browser.close()
+
     def parse_reviews(self, brand: str, model: str) -> List[Review]:
         """Parse reviews for given brand and model.
 
@@ -123,6 +187,31 @@ class DromParser(BaseParser):
         page.goto(url)
         page.wait_for_load_state("networkidle")
 
+    def _expand_hidden_blocks(self, page: Page) -> None:
+        """Разворачивает скрытые блоки с характеристиками и оценками.
+
+        Args:
+            page: Объект страницы Playwright
+        """
+        try:
+            # Простой подход - кликаем на все кнопки разворачивания
+            buttons = page.query_selector_all('button[data-toggle="preview-dropdown"]')
+            print(f"    Найдено кнопок для разворачивания: {len(buttons)}")
+
+            for i, button in enumerate(buttons):
+                try:
+                    button.click()
+                    print(f"    Кликнули на кнопку #{i+1}")
+                    page.wait_for_timeout(500)  # небольшая пауза между кликами
+                except Exception as e:
+                    print(f"    Ошибка клика на кнопку #{i+1}: {e}")
+
+            # Дополнительная пауза для завершения анимации
+            page.wait_for_timeout(1000)
+
+        except Exception as e:
+            print(f"    Ошибка разворачивания блоков: {e}")
+
     def _extract_review_data(self, html_content: str, url: str) -> Dict:
         """Извлекает структурированные данные из HTML отзыва.
 
@@ -136,6 +225,7 @@ class DromParser(BaseParser):
         soup = BeautifulSoup(html_content, "html.parser")
         data = {
             "url": url,
+            "type": "review",  # Для одиночного отзыва всегда review
             "text": "",
             "rating": None,
             "owner_rating": None,
@@ -148,10 +238,18 @@ class DromParser(BaseParser):
         }
 
         try:
+            # Извлекаем brand и model из URL
+            brand, model = self._extract_brand_model(url)
+            data["brand"] = brand
+            data["model"] = model
+            data["date"] = ""  # Будет заполнено ниже если найдено
+            data["content"] = ""  # Будет заполнено ниже
+
             # Извлекаем текст отзыва (основной отзыв)
             review_text = soup.find("div", {"itemprop": "reviewBody"})
             if review_text:
                 data["text"] = review_text.get_text(strip=True)
+                data["content"] = data["text"]  # Для совместимости
             else:
                 # Для дополнений к отзывам используем другой селектор
                 editable_area = soup.find("div", class_="b-editable-area")
@@ -159,6 +257,7 @@ class DromParser(BaseParser):
                     # Ищем текст внутри editable-area
                     text_content = editable_area.get_text(strip=True)
                     data["text"] = text_content
+                    data["content"] = text_content  # Для совместимости
 
                     # Определяем тип контента
                     if "/reviews/" in url and url.count("/") >= 6:  # дополнение
@@ -178,9 +277,15 @@ class DromParser(BaseParser):
             owner_rating = soup.find("span", {"itemprop": "ratingValue"})
             if owner_rating:
                 try:
-                    data["owner_rating"] = float(owner_rating.text.strip())
+                    rating_value = float(owner_rating.text.strip())
+                    data["owner_rating"] = rating_value
+                    print(f"    Найдена общая оценка: {rating_value}")
                 except (ValueError, AttributeError):
-                    pass
+                    print(
+                        f"    Ошибка парсинга общей оценки: {owner_rating.text if owner_rating else 'None'}"
+                    )
+            else:
+                print("    Общая оценка не найдена")
 
             # Извлекаем автора
             author_elem = soup.find("span", {"itemprop": "name"})
@@ -205,9 +310,19 @@ class DromParser(BaseParser):
                 except (ValueError, IndexError):
                     pass
 
-            # Извлекаем характеристики автомобиля
-            tables = soup.find_all("table", class_="drom-table")
-            for table in tables:
+            # Извлекаем характеристики автомобиля и оценки
+            # Ищем все таблицы с классом drom-table (включая подклассы)
+            all_tables = soup.find_all("table")
+            tables = []
+            for table in all_tables:
+                table_classes = table.get("class", [])
+                if any("drom-table" in str(cls) for cls in table_classes):
+                    tables.append(table)
+
+            print(f"    Найдено {len(tables)} таблиц drom-table")
+
+            for i, table in enumerate(tables):
+                print(f"    Обрабатываем таблицу #{i+1}")
                 rows = table.find_all("tr")
                 for row in rows:
                     cells = row.find_all("td")
@@ -215,18 +330,34 @@ class DromParser(BaseParser):
                         key = cells[0].text.strip().rstrip(":")
                         value = cells[1].text.strip()
 
-                        # Разделяем характеристики и оценки
-                        if key in [
+                        # Оценки по категориям (числовые значения 1-10)
+                        rating_keys = [
                             "Внешний вид",
                             "Салон",
                             "Двигатель",
                             "Ходовые качества",
-                        ]:
+                        ]
+                        if key in rating_keys:
                             try:
-                                data["characteristics"][key] = int(value)
+                                # Проверяем, является ли это числовой оценкой
+                                if value.isdigit() or (
+                                    value.replace(".", "").isdigit()
+                                ):
+                                    numeric_value = int(float(value))
+                                    data["characteristics"][key] = numeric_value
+                                    print(f"    Найдена оценка {key}: {numeric_value}")
+                                else:
+                                    # Это техническая характеристика с тем же названием
+                                    data["car_specs"][key] = value
+                                    print(
+                                        f"    Найдена тех. характеристика {key}: {value}"
+                                    )
                             except ValueError:
-                                data["characteristics"][key] = value
+                                # Если не число, сохраняем как техническую характеристику
+                                data["car_specs"][key] = value
+                                print(f"    Найдена характеристика {key}: {value}")
                         else:
+                            # Технические характеристики автомобиля
                             data["car_specs"][key] = value
 
         except Exception as e:
@@ -298,6 +429,10 @@ class DromParser(BaseParser):
                                 time.sleep(self.request_delay)
 
                             self._go_to_page(page, review_url)
+
+                            # Разворачиваем скрытые блоки с оценками
+                            self._expand_hidden_blocks(page)
+
                             content = page.content()
 
                             # Извлекаем структурированные данные
@@ -427,6 +562,14 @@ class DromParser(BaseParser):
                                 except (ValueError, TypeError):
                                     mileage = None
 
+                            # Извлекаем оценки по категориям
+                            characteristics = structured_data.get("characteristics", {})
+                            overall_rating = structured_data.get("owner_rating")
+                            exterior_rating = characteristics.get("Внешний вид")
+                            interior_rating = characteristics.get("Салон")
+                            engine_rating = characteristics.get("Двигатель")
+                            driving_rating = characteristics.get("Ходовые качества")
+
                             review = Review(
                                 source="drom.ru",
                                 type=content_type,
@@ -436,6 +579,11 @@ class DromParser(BaseParser):
                                 content=structured_data.get("text", ""),
                                 author=structured_data.get("author", ""),
                                 rating=structured_data.get("owner_rating"),
+                                overall_rating=overall_rating,
+                                exterior_rating=exterior_rating,
+                                interior_rating=interior_rating,
+                                engine_rating=engine_rating,
+                                driving_rating=driving_rating,
                                 views_count=structured_data.get("views", 0),
                                 comments_count=structured_data.get("comments", 0),
                                 likes_count=structured_data.get("likes", 0),
@@ -552,6 +700,9 @@ class DromParser(BaseParser):
                             review_url = f"{self.base_url}{review_url}"
 
                         self._go_to_page(page, review_url)
+
+                        # Разворачиваем скрытые блоки с оценками
+                        self._expand_hidden_blocks(page)
 
                         content = page.content()
                         brand, model = self._extract_brand_model(review_url)

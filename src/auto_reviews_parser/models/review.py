@@ -19,6 +19,12 @@ class Review:
     content: str = ""
     author: str = ""
     rating: Optional[float] = None
+    # Оценки по категориям
+    overall_rating: Optional[float] = None  # общая оценка машины
+    exterior_rating: Optional[int] = None  # внешний вид
+    interior_rating: Optional[int] = None  # салон
+    engine_rating: Optional[int] = None  # двигатель
+    driving_rating: Optional[int] = None  # ходовые качества
     pros: str = ""
     cons: str = ""
     mileage: Optional[int] = None
