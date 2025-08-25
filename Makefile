@@ -88,7 +88,7 @@ format:
 # Инициализация системы
 run-init:
 	@echo "$(BLUE)🚀 Инициализация системы...$(NC)"
-	cd scripts && $(PYTHON) main.py init --db ../$(DB_FILE) --html ../$(HTML_FILE)
+	cd scripts && $(PYTHON) main.py --db ../$(DB_FILE) --html ../$(HTML_FILE) init
 
 # Парсинг отзывов (с параметрами)
 run-parse:
@@ -99,12 +99,12 @@ ifndef MODEL
 	$(error MODEL не задан. Используйте: make run-parse BRAND=toyota MODEL=camry)
 endif
 	@echo "$(BLUE)🚗 Парсинг отзывов $(BRAND)/$(MODEL)...$(NC)"
-	cd scripts && $(PYTHON) main.py parse $(BRAND) $(MODEL) --db ../$(DB_FILE)
+	cd scripts && $(PYTHON) main.py --db ../$(DB_FILE) parse $(BRAND) $(MODEL)
 
 # Показать статистику
 run-stats:
 	@echo "$(BLUE)📊 Статистика базы данных...$(NC)"
-	cd scripts && $(PYTHON) main.py stats --db ../$(DB_FILE)
+	cd scripts && $(PYTHON) main.py --db ../$(DB_FILE) stats
 
 # Полный цикл
 run-full:
@@ -115,8 +115,8 @@ ifndef MODEL
 	$(error MODEL не задан. Используйте: make run-full BRAND=toyota MODEL=camry)
 endif
 	@echo "$(BLUE)🎯 Полный цикл для $(BRAND)/$(MODEL)...$(NC)"
-	cd scripts && $(PYTHON) main.py full --db ../$(DB_FILE) --html ../$(HTML_FILE) \
-		--brand $(BRAND) --model $(MODEL)
+	cd scripts && $(PYTHON) main.py --db ../$(DB_FILE) --html ../$(HTML_FILE) \
+		--brand $(BRAND) --model $(MODEL) full
 
 # Git статус
 git-status:
