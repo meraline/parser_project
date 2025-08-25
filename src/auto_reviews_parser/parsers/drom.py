@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import time
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -899,3 +900,166 @@ class DromParser(BaseParser):
                 browser.close()
 
         return reviews
+
+    def parse_comments(self, review_url: str) -> List[Dict]:
+        """Парсит комментарии к отзыву.
+
+        Args:
+            review_url: URL отзыва
+
+        Returns:
+            Список словарей с данными комментариев
+        """
+        comments = []
+
+        with sync_playwright() as p:
+            # Используем локальный браузер если он доступен
+            if os.path.exists(self.chrome_path):
+                browser = p.chromium.launch(
+                    executable_path=self.chrome_path, headless=True
+                )
+            else:
+                browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+
+            try:
+                self._go_to_page(page, review_url)
+
+                # Ждем загрузки комментариев
+                page.wait_for_timeout(3000)
+
+                # Скроллим до блока комментариев
+                try:
+                    page.locator("#comments_block").scroll_into_view_if_needed()
+                    page.wait_for_timeout(1000)
+                except Exception:
+                    pass
+
+                # Получаем HTML после загрузки
+                html_content = page.content()
+                soup = BeautifulSoup(html_content, "html.parser")
+
+                # Ищем блок с комментариями по точному селектору
+                comments_block = soup.select_one('div[data-comments-list=""]')
+                if not comments_block:
+                    print("    Блок комментариев не найден")
+                    return comments
+
+                # Ищем все комментарии в блоке
+                comment_elements = comments_block.select("div.b-comment")
+
+                if comment_elements:
+                    print(f"    Найдено {len(comment_elements)} комментариев")
+
+                    for comment_elem in comment_elements:
+                        comment_data = self._extract_comment_data(comment_elem)
+                        if comment_data and comment_data.get("content"):
+                            comment_data["source_url"] = review_url
+                            comments.append(comment_data)
+                else:
+                    print("    Комментарии не найдены в блоке")
+
+            except Exception as e:
+                print(f"    Ошибка парсинга комментариев: {e}")
+                logger.error(f"Ошибка парсинга комментариев для {review_url}: {e}")
+            finally:
+                browser.close()
+
+        return comments
+
+    def _extract_comment_data(self, comment_elem) -> Dict:
+        """Извлекает данные из элемента комментария.
+
+        Args:
+            comment_elem: HTML элемент комментария (div.b-comment)
+
+        Returns:
+            Словарь с данными комментария
+        """
+        data = {
+            "author": "",
+            "content": "",
+            "rating": None,
+            "likes_count": 0,
+            "publish_date": None,
+        }
+
+        try:
+            # Извлекаем ID комментария из атрибута id
+            comment_id = comment_elem.get("id", "")
+            if comment_id.startswith("comment"):
+                data["comment_id"] = comment_id.replace("comment", "")
+
+            # Ищем автора в блоке .b-comment__author
+            author_block = comment_elem.select_one(".b-comment__author")
+            if author_block:
+                # Ищем имя автора в span.b-fix-wordwrap
+                author_elem = author_block.select_one("span.b-fix-wordwrap")
+                if author_elem:
+                    # Проверяем, есть ли ссылка внутри span
+                    author_link = author_elem.select_one("a")
+                    if author_link:
+                        data["author"] = author_link.get_text(strip=True)
+                    else:
+                        data["author"] = author_elem.get_text(strip=True)
+
+                # Ищем дату публикации в ссылке с rel="nofollow"
+                date_elem = author_block.select_one('a[rel="nofollow"]')
+                if date_elem:
+                    date_text = date_elem.get_text(strip=True)
+                    try:
+                        # Парсим дату в формате "dd.mm.yyyy"
+                        parsed_date = datetime.strptime(date_text, "%d.%m.%Y")
+                        data["publish_date"] = parsed_date
+                    except ValueError:
+                        # Если не удалось распарсить, сохраняем как строку
+                        data["publish_date"] = date_text
+
+            # Ищем содержание комментария в блоке .b-comment__content
+            content_block = comment_elem.select_one(".b-comment__content")
+            if content_block:
+                # Ищем основной текст в .b-comment__text
+                text_elem = content_block.select_one(".b-comment__text")
+                if text_elem:
+                    # Ищем div с текстом (исключая ответы)
+                    content_div = text_elem.select_one("div")
+                    if content_div:
+                        # Проверяем, что это не блок ответа
+                        if not content_div.has_attr(
+                            "class"
+                        ) or "b-comment__answer" not in content_div.get("class", []):
+                            content_text = content_div.get_text(
+                                separator=" ", strip=True
+                            )
+                            data["content"] = content_text
+
+            # Ищем количество лайков в блоке голосования
+            votes_block = comment_elem.select_one("div[data-comments-vote-item]")
+            if votes_block:
+                # Ищем плюсы
+                plus_elem = votes_block.select_one(
+                    ".b-comment__vote_plus span[data-comments-vote-text]"
+                )
+                if plus_elem:
+                    plus_text = plus_elem.get_text(strip=True)
+                    try:
+                        likes = int(plus_text) if plus_text else 0
+                        data["likes_count"] = likes
+                    except ValueError:
+                        data["likes_count"] = 0
+
+                # Ищем минусы (для полноты информации)
+                minus_elem = votes_block.select_one(
+                    ".b-comment__vote_minus span[data-comments-vote-text]"
+                )
+                if minus_elem:
+                    minus_text = minus_elem.get_text(strip=True)
+                    try:
+                        data["dislikes_count"] = int(minus_text) if minus_text else 0
+                    except ValueError:
+                        data["dislikes_count"] = 0
+
+        except Exception as e:
+            logger.error(f"Ошибка извлечения данных комментария: {e}")
+
+        return data
