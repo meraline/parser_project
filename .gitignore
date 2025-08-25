@@ -78,3 +78,8 @@ ffmpeg*/
 
 # Dependencies  
 node_modules/
+
+# VS Code temp files
+**/*.db
+data/
+archive/
