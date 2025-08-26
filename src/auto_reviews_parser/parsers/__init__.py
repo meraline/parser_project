@@ -1,9 +1,9 @@
 from .base import BaseParser, ParserError
-from .drom import DromParser  # type: ignore
+from .drom_reviews import DromReviewsParser
 from ..models.review import Review
 
 __all__ = [
     "BaseParser",
-    "DromParser",
+    "DromReviewsParser",
     "ParserError",
 ]

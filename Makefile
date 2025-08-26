@@ -17,7 +17,8 @@ NC := \033[0m # No Color
 
 .PHONY: help clean setup install test run-init run-parse run-stats \
         run-full check-lint format git-status git-commit docker-build \
-        docker-run env-activate env-deactivate
+        docker-run env-activate env-deactivate postgres-start postgres-stop \
+        postgres-migrate postgres-status postgres-shell
 
 # Помощь по командам
 help:
@@ -36,6 +37,12 @@ help:
 	@echo "  $(GREEN)run-parse$(NC)    - Парсинг отзывов (BRAND=toyota MODEL=camry)"
 	@echo "  $(GREEN)run-stats$(NC)    - Показать статистику"
 	@echo "  $(GREEN)run-full$(NC)     - Полный цикл"
+	@echo ""
+	@echo "  $(GREEN)postgres-start$(NC)   - Запуск локального PostgreSQL"
+	@echo "  $(GREEN)postgres-stop$(NC)    - Остановка PostgreSQL"
+	@echo "  $(GREEN)postgres-migrate$(NC) - Миграция данных в PostgreSQL"
+	@echo "  $(GREEN)postgres-status$(NC)  - Статус PostgreSQL"
+	@echo "  $(GREEN)postgres-shell$(NC)   - Консоль PostgreSQL"
 	@echo ""
 	@echo "  $(GREEN)git-status$(NC)   - Показать статус git"
 	@echo "  $(GREEN)git-commit$(NC)   - Коммит изменений"
@@ -175,3 +182,39 @@ init-project:
 	mkdir -p data logs cache output
 	touch data/.gitkeep logs/.gitkeep cache/.gitkeep output/.gitkeep
 	@echo "$(GREEN)✅ Структура проекта создана$(NC)"
+
+# PostgreSQL команды
+postgres-start:
+	@echo "$(BLUE)🐘 Проверяем статус локального PostgreSQL...$(NC)"
+	@sudo systemctl start postgresql || (echo "$(RED)❌ Не удалось запустить PostgreSQL$(NC)" && exit 1)
+	@echo "$(GREEN)✅ PostgreSQL запущен$(NC)"
+
+postgres-stop:
+	@echo "$(BLUE)🐘 Останавливаем локальный PostgreSQL...$(NC)"
+	@sudo systemctl stop postgresql
+	@echo "$(GREEN)✅ PostgreSQL остановлен$(NC)"
+
+postgres-status:
+	@echo "$(BLUE)🐘 Статус PostgreSQL:$(NC)"
+	@sudo systemctl status postgresql --no-pager
+
+postgres-migrate:
+	@echo "$(BLUE)🔄 Миграция данных из SQLite в PostgreSQL...$(NC)"
+	@if [ ! -f "$(DB_FILE)" ]; then \
+		echo "$(RED)❌ SQLite база $(DB_FILE) не найдена$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(YELLOW)⚠️ Убедитесь, что PostgreSQL запущен (make postgres-start)$(NC)"
+	@sleep 2
+	cd scripts/migration && $(PYTHON) migrate_sqlite_to_postgres.py
+	@echo "$(GREEN)✅ Миграция завершена$(NC)"
+
+postgres-shell:
+	@echo "$(BLUE)🐘 Подключение к PostgreSQL...$(NC)"
+	@PGPASSWORD=parser psql -h localhost -p 5432 -U parser -d auto_reviews
+
+# Установка зависимостей для PostgreSQL
+install-postgres:
+	@echo "$(BLUE)🐘 Установка зависимостей PostgreSQL...$(NC)"
+	$(VENV)/bin/pip install psycopg2-binary
+	@echo "$(GREEN)✅ Зависимости PostgreSQL установлены$(NC)"
