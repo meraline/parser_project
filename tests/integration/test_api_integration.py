@@ -4,7 +4,15 @@ Integration тесты для API взаимодействий
 import pytest
 import requests
 from unittest.mock import Mock, patch, MagicMock
-from requests.exceptions import RequestException, Timeout, ConnectionError
+
+# Импорт exceptions из requests или моков
+try:
+    from requests.exceptions import RequestException, Timeout, ConnectionError
+except ImportError:
+    # Используем mock exceptions
+    RequestException = requests.exceptions.RequestException
+    Timeout = requests.exceptions.Timeout  
+    ConnectionError = requests.exceptions.ConnectionError
 
 
 class TestAPIIntegration:

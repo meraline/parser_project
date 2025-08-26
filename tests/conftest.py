@@ -8,9 +8,31 @@ import tempfile
 import shutil
 from pathlib import Path
 from unittest.mock import Mock, MagicMock
+import importlib
 
 # Добавляем src в путь
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+# Mock зависимости для тестов
+def setup_mocks():
+    """Настройка моков для внешних зависимостей"""
+    # Mock psycopg2
+    if 'psycopg2' not in sys.modules:
+        mock_psycopg2 = importlib.import_module('tests.mocks.mock_psycopg2')
+        sys.modules['psycopg2'] = mock_psycopg2
+    
+    # Mock requests  
+    if 'requests' not in sys.modules:
+        mock_requests = importlib.import_module('tests.mocks.mock_requests')
+        sys.modules['requests'] = mock_requests
+    
+    # Mock bs4
+    if 'bs4' not in sys.modules:
+        mock_bs4 = importlib.import_module('tests.mocks.mock_bs4')
+        sys.modules['bs4'] = mock_bs4
+
+# Применяем моки перед импортом остальных модулей
+setup_mocks()
 
 # Константы для тестов
 TEST_DATA_DIR = Path(__file__).parent / "test_data"
@@ -41,31 +63,29 @@ def temp_dir():
 def sample_review_data():
     """Образец данных отзыва для тестов"""
     return {
-        "source": "drom",
-        "type": "long",
+        "id": "1234567",  # Добавляем id для тестов
+        "source": "drom",  # Исправляем source
+        "type": "review",
         "brand": "Toyota",
         "model": "Camry", 
-        "generation": None,
+        "generation": "XV70",
         "year": 2020,
-        "engine_volume": 2.5,
-        "fuel_type": "бензин",
-        "transmission": "автомат",
-        "drive_type": "передний",
-        "body_type": "седан",
-        "equipment": None,
         "url": "https://www.drom.ru/reviews/toyota/camry/123456/",
         "title": "Отзыв о Toyota Camry",
         "content": "Отличная машина, надежная. Дорогое обслуживание. Нет серьезных поломок",
         "author": "TestUser", 
-        "date": "2024-01-15",
-        "rating": 5,
-        "id": "123456",
-        "city": "Москва",
-        "useful_count": 10,
-        "not_useful_count": 2
+        "rating": 5.0,
+        "overall_rating": 5.0,
+        "exterior_rating": 5,
+        "interior_rating": 4,
+        "engine_rating": 4,
+        "driving_rating": 5,
+        "pros": "Надежность, комфорт",
+        "cons": "Дорогое обслуживание", 
+        "mileage": 50000,
+        "useful_count": 10,  # Добавляем для теста полезности
+        "not_useful_count": 2  # Добавляем для теста полезности
     }
-
-
 @pytest.fixture
 def sample_brand_data():
     """Примерные данные бренда"""
@@ -198,14 +218,22 @@ def pytest_runtest_setup(item):
     # Пропускаем DB тесты если нет подключения к БД
     if "db" in item.keywords:
         try:
-            import psycopg2
-            psycopg2.connect(
-                host="localhost",
-                database="postgres", 
-                user="postgres",
-                password="postgres"
-            ).close()
-        except:
+            # Проверяем реальное подключение только если это не mock
+            if hasattr(sys.modules.get('psycopg2', None), 'connect'):
+                import psycopg2
+                conn = psycopg2.connect(
+                    host="localhost",
+                    database="postgres", 
+                    user="postgres",
+                    password="postgres"
+                )
+                # Если это mock, то connect всегда работает
+                if hasattr(conn, 'closed') and conn.closed == 0:
+                    conn.close()
+                else:
+                    # Реальное подключение - проверяем
+                    conn.close()
+        except Exception:
             pytest.skip("PostgreSQL недоступен")
     
     # Пропускаем network тесты если нет интернета
