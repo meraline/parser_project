@@ -461,50 +461,376 @@ class MasterDromParser:
         return long_reviews_count, short_reviews_count
 
     def parse_long_reviews(self, model: ModelInfo, limit: Optional[int] = None) -> List[ReviewData]:
-        """Парсинг длинных отзывов"""
+        """Парсинг длинных отзывов с получением URL и индивидуальным парсингом"""
         logger.info(f"📝 Парсинг длинных отзывов для {model.brand} {model.name}")
         
         reviews = []
-        page = 1
-        max_pages = 10  # Ограничение для безопасности
         
-        while page <= max_pages:
-            if limit and len(reviews) >= limit:
+        # Получаем URL отзывов со страницы списка
+        review_urls = self._get_review_urls_from_list_page(model)
+        
+        if not review_urls:
+            logger.warning(f"Не найдено URL отзывов для {model.brand} {model.name}")
+            return reviews
+        
+        logger.info(f"Найдено {len(review_urls)} URL отзывов")
+        
+        # Парсим каждый отзыв индивидуально
+        for i, review_url in enumerate(review_urls):
+            if limit and i >= limit:
                 break
                 
-            # URL страницы с длинными отзывами
+            logger.debug(f"Парсинг отзыва {i+1}/{len(review_urls)}: {review_url}")
+            
+            review = self._parse_individual_review_page(review_url, model)
+            if review:
+                reviews.append(review)
+                self.stats['reviews_parsed'] += 1
+            
+            # Небольшая задержка между запросами
+            time.sleep(self.delay)
+        
+        logger.info(f"✅ Получено {len(reviews)} длинных отзывов")
+        return reviews
+
+    def _get_review_urls_from_list_page(self, model: ModelInfo) -> List[str]:
+        """Получает список URL отзывов со страницы списка отзывов"""
+        try:
+            # URL страницы с длинными отзывами  
             if not model.url.startswith('http'):
                 url = urljoin(self.base_url, model.url)
             else:
                 url = model.url
                 
-            if page > 1:
-                url += f"?page={page}"
-                
             soup = self._make_request(url)
             if not soup:
-                break
-                
-            # Поиск блоков длинных отзывов
-            review_blocks = soup.find_all("div", {"data-ftid": "component_review"})
+                return []
             
-            if not review_blocks:
-                logger.info(f"📄 Нет длинных отзывов на странице {page}")
-                break
+            review_urls = []
+            
+            # Ищем ссылки на отзывы в HTML
+            links = soup.find_all('a', href=True)
+            
+            for link in links:
+                href = link['href']
                 
-            for block in review_blocks:
-                if limit and len(reviews) >= limit:
-                    break
+                # Проверяем что это ссылка на отзыв (содержит ID отзыва в конце)
+                if '/reviews/' in href and href.count('/') >= 4:
+                    # Получаем полный URL
+                    if href.startswith('http'):
+                        full_url = href
+                    else:
+                        full_url = urljoin(self.base_url, href)
                     
-                review = self._parse_long_review_block(block, model)
-                if review:
-                    reviews.append(review)
-                    self.stats['reviews_parsed'] += 1
-                    
-            page += 1
+                    # Извлекаем последний сегмент URL
+                    url_parts = href.rstrip('/').split('/')
+                    if url_parts and url_parts[-1].isdigit():
+                        review_urls.append(full_url)
+            
+            # Удаляем дубликаты
+            review_urls = list(set(review_urls))
+            
+            logger.debug(f"Найдено {len(review_urls)} URL отзывов")
+            return review_urls
+            
+        except Exception as e:
+            logger.error(f"Ошибка получения URL отзывов: {e}")
+            return []
             
         logger.info(f"✅ Получено {len(reviews)} длинных отзывов")
         return reviews
+
+    def _parse_individual_review_page(self, review_url: str, model: ModelInfo) -> Optional[ReviewData]:
+        """Парсит отдельную страницу длинного отзыва с полными характеристиками"""
+        try:
+            soup = self._make_request(review_url)
+            if not soup:
+                return None
+            
+            # Извлекаем ID отзыва из URL
+            review_id = review_url.rstrip('/').split('/')[-1]
+            
+            # Инициализируем данные отзыва
+            review_data = {
+                'review_id': review_id,
+                'brand': model.brand.lower(),
+                'model': model.url_name,
+                'review_type': 'long',
+                'url': review_url,
+                'photos': [],
+                'photos_count': 0,
+                'car_characteristics': {},
+                'detailed_ratings': {},
+                'experience_info': {},
+                'pros': None,
+                'cons': None
+            }
+            
+            # Заголовок
+            title_elem = soup.select_one('h1') or soup.find('title')
+            if title_elem:
+                review_data['title'] = title_elem.get_text(strip=True)
+            
+            # Автор (более точный селектор)
+            author_elem = soup.select_one('[itemprop="author"]')
+            if not author_elem:
+                author_elem = soup.select_one('.reviewer [itemprop="name"]')
+            if author_elem:
+                review_data['author'] = author_elem.get_text(strip=True)
+            
+            # Рейтинг
+            rating_elem = soup.select_one('[itemprop="ratingValue"]')
+            if rating_elem:
+                try:
+                    rating_value = rating_elem.get('content') or rating_elem.get_text(strip=True)
+                    if isinstance(rating_value, str):
+                        review_data['rating'] = float(rating_value)
+                    else:
+                        review_data['rating'] = 0
+                except (ValueError, TypeError):
+                    review_data['rating'] = 0
+            
+            # Основной контент отзыва
+            content_elem = soup.select_one('[itemprop="reviewBody"]')
+            if content_elem:
+                review_data['content'] = content_elem.get_text(strip=True)
+            
+            # Дата публикации
+            date_elem = soup.select_one('[itemprop="datePublished"]')
+            if date_elem:
+                review_data['date'] = date_elem.get('content') or date_elem.get_text(strip=True)
+            
+            # Извлечение характеристик автомобиля из Schema.org
+            car_characteristics = {}
+            
+            # Бренд
+            brand_elem = soup.select_one('[itemprop="brand"]')
+            if brand_elem:
+                car_characteristics['brand'] = brand_elem.get_text(strip=True)
+            
+            # Модель
+            model_elem = soup.select_one('[itemprop="model"]')
+            if model_elem:
+                car_characteristics['model'] = model_elem.get_text(strip=True)
+            
+            # Год выпуска
+            year_elem = soup.select_one('[itemprop="vehicleModelDate"]')
+            if year_elem:
+                car_characteristics['year'] = year_elem.get_text(strip=True)
+            
+            # Извлечение характеристик из таблицы
+            tables = soup.select('table')
+            for table in tables:
+                rows = table.select('tr')
+                for row in rows:
+                    cells = row.select('td, th')
+                    if len(cells) >= 2:
+                        key = cells[0].get_text(strip=True).replace(':', '').lower()
+                        value = cells[1].get_text(strip=True)
+                        
+                        # Мапим ключи на стандартные названия
+                        key_mapping = {
+                            'год выпуска': 'year',
+                            'тип кузова': 'body_type', 
+                            'трансмиссия': 'transmission',
+                            'привод': 'drive_type',
+                            'двигатель': 'engine',
+                            'объем двигателя': 'engine_volume',
+                            'мощность': 'engine_power',
+                            'топливо': 'fuel_type',
+                            'расход топлива': 'fuel_consumption',
+                            'разгон до 100': 'acceleration',
+                            'максимальная скорость': 'max_speed'
+                        }
+                        
+                        mapped_key = key_mapping.get(key, key)
+                        if value and value != '-':
+                            car_characteristics[mapped_key] = value
+            
+            # Информация об автомобиле из текста
+            all_text = soup.get_text()
+            
+            # Поиск характеристик двигателя из текста (дополнительно)
+            engine_patterns = [
+                (r'(\d+[.,]\d+)\s*(?:л|литра|литров)', 'engine_volume_text'),
+                (r'(\d+)\s*л\.?с\.?', 'engine_power_text'),
+                (r'(\d+)\s*куб[.,]\s*см', 'engine_displacement'),
+                (r'V(\d+)', 'engine_cylinders'),
+                (r'(\d{4})\s*куб\.см', 'engine_displacement_full')
+            ]
+            
+            for pattern, key in engine_patterns:
+                match = re.search(pattern, all_text, re.IGNORECASE)
+                if match and key not in car_characteristics:
+                    car_characteristics[key] = match.group(1)
+            
+            # Поиск типа коробки передач из текста (если не найдено в таблице)
+            if 'transmission' not in car_characteristics:
+                transmission_patterns = [
+                    r'(автомат|АКПП|автоматическая)',
+                    r'(механика|МКПП|механическая)',
+                    r'(вариатор|CVT)',
+                    r'(робот|роботизированная)'
+                ]
+                
+                for pattern in transmission_patterns:
+                    match = re.search(pattern, all_text, re.IGNORECASE)
+                    if match:
+                        car_characteristics['transmission'] = match.group(1)
+                        break
+            
+            # Поиск типа привода из текста (если не найдено в таблице)
+            if 'drive_type' not in car_characteristics:
+                drive_patterns = [
+                    r'(4WD|4вд|полный привод|AWD)',
+                    r'(2WD|2вд|передний привод|FWD)',
+                    r'(задний привод|RWD)'
+                ]
+                
+                for pattern in drive_patterns:
+                    match = re.search(pattern, all_text, re.IGNORECASE)
+                    if match:
+                        car_characteristics['drive_type'] = match.group(1)
+                        break
+            
+            # Поиск расхода топлива
+            fuel_patterns = [
+                r'расход.*?(\d+[.,]\d+).*?л',
+                r'(\d+[.,]\d+).*?л.*?100.*?км',
+                r'город.*?(\d+[.,]\d+).*?литр',
+                r'трасса.*?(\d+[.,]\d+).*?литр'
+            ]
+            
+            fuel_consumption = []
+            for pattern in fuel_patterns:
+                matches = re.findall(pattern, all_text, re.IGNORECASE)
+                fuel_consumption.extend(matches)
+            
+            if fuel_consumption and 'fuel_consumption' not in car_characteristics:
+                car_characteristics['fuel_consumption'] = ', '.join(fuel_consumption[:3])  # Ограничим 3 значениями
+            
+            # Поиск пробега
+            mileage_patterns = [
+                r'пробег.*?(\d+[.,]?\d*)\s*(?:км|тыс|тысяч)',
+                r'(\d+[.,]?\d*)\s*(?:км|тыс|тысяч).*?пробег',
+                r'(\d+)\s*миль'
+            ]
+            
+            for pattern in mileage_patterns:
+                match = re.search(pattern, all_text, re.IGNORECASE)
+                if match:
+                    car_characteristics['mileage'] = match.group(1)
+                    break
+            
+            review_data['car_characteristics'] = car_characteristics
+            
+            # Детальные рейтинги - поиск всех рейтингов из Schema.org
+            detailed_ratings = {}
+            
+            # Извлекаем все элементы с рейтингами
+            rating_elements = soup.select('[itemprop="ratingValue"]')
+            for i, elem in enumerate(rating_elements):
+                try:
+                    rating_value = elem.get('content') or elem.get_text(strip=True)
+                    if isinstance(rating_value, str) and rating_value.replace('.', '').replace(',', '').isdigit():
+                        rating_float = float(rating_value.replace(',', '.'))
+                        detailed_ratings[f'rating_{i+1}'] = rating_float
+                except (ValueError, TypeError):
+                    continue
+            
+            # Поиск рейтингов в тексте (цифры от 1 до 10 с десятичными)
+            rating_text_patterns = [
+                r'надежность.*?(\d+[.,]\d+)',
+                r'комфорт.*?(\d+[.,]\d+)',
+                r'динамика.*?(\d+[.,]\d+)',
+                r'дизайн.*?(\d+[.,]\d+)',
+                r'безопасность.*?(\d+[.,]\d+)',
+                r'экономия.*?(\d+[.,]\d+)',
+                r'управляемость.*?(\d+[.,]\d+)',
+                r'качество.*?(\d+[.,]\d+)'
+            ]
+            
+            for pattern in rating_text_patterns:
+                match = re.search(pattern, all_text, re.IGNORECASE)
+                if match:
+                    try:
+                        rating_value = float(match.group(1).replace(',', '.'))
+                        if 1 <= rating_value <= 10:
+                            category = pattern.split('.*?')[0]
+                            detailed_ratings[category] = rating_value
+                    except (ValueError, TypeError):
+                        continue
+            
+            # Поиск блоков с оценками (числовые значения в определенных CSS селекторах)
+            rating_blocks = soup.select('.b-info-block__image_centred-content, .rating-value, .score, [class*="rating"]')
+            for i, block in enumerate(rating_blocks):
+                rating_text = block.get_text(strip=True)
+                if re.match(r'^\d+[.,]?\d*$', rating_text):
+                    try:
+                        rating_value = float(rating_text.replace(',', '.'))
+                        if 1 <= rating_value <= 10:
+                            detailed_ratings[f'block_rating_{i+1}'] = rating_value
+                    except (ValueError, TypeError):
+                        continue
+            
+            review_data['detailed_ratings'] = detailed_ratings
+            
+            # Информация об опыте владения
+            experience_info = {}
+            
+            # Поиск года приобретения
+            acquisition_match = re.search(r'(?:приобрет|купил|взял).*?(\d{4})', all_text, re.IGNORECASE)
+            if acquisition_match:
+                experience_info['acquisition_year'] = acquisition_match.group(1)
+            
+            # Поиск срока владения
+            ownership_patterns = [
+                r'владею.*?(\d+).*?(?:год|лет)',
+                r'катаюсь.*?(\d+).*?(?:год|лет)',
+                r'езжу.*?(\d+).*?(?:год|лет)'
+            ]
+            
+            for pattern in ownership_patterns:
+                match = re.search(pattern, all_text, re.IGNORECASE)
+                if match:
+                    experience_info['ownership_period'] = match.group(1)
+                    break
+            
+            review_data['experience_info'] = experience_info
+            
+            # Фотографии
+            photos = []
+            img_elements = soup.select('img')
+            for img in img_elements:
+                src = img.get('src') or img.get('data-src') or img.get('srcset')
+                if src and ('photo' in src or 'auto.drom.ru' in src or 's.auto.drom.ru' in src):
+                    if isinstance(src, str) and src.startswith('http'):
+                        photos.append(src)
+            
+            review_data['photos'] = photos
+            review_data['photos_count'] = len(photos)
+            
+            logger.debug(f"Обработан отзыв: {review_data.get('title', 'Без заголовка')[:50]} с {len(car_characteristics)} характеристиками")
+            
+            # Создаем объект ReviewData
+            return ReviewData(
+                review_id=review_data['review_id'],
+                brand=review_data['brand'],
+                model=review_data['model'],
+                review_type=review_data['review_type'],
+                url=review_data['url'],
+                title=review_data.get('title'),
+                author=review_data.get('author'),
+                rating=review_data.get('rating'),
+                content=review_data.get('content'),
+                date=review_data.get('date'),
+                photos=review_data['photos'],
+                photos_count=review_data['photos_count']
+            )
+            
+        except Exception as e:
+            logger.error(f"Ошибка при парсинге отзыва {review_url}: {e}")
+            return None
 
     def parse_short_reviews(self, model: ModelInfo, limit: Optional[int] = None) -> List[ReviewData]:
         """Парсинг коротких отзывов"""
@@ -554,17 +880,21 @@ class MasterDromParser:
         return reviews
 
     def _parse_long_review_block(self, block, model: ModelInfo) -> Optional[ReviewData]:
-        """Парсинг блока длинного отзыва"""
+        """Парсинг блока длинного отзыва с рабочими селекторами"""
         try:
             # Получаем ID отзыва из data-ga-stats-va-payload
             payload_str = block.get('data-ga-stats-va-payload', '{}')
             review_id = ''
+            import json
             try:
-                import json
                 payload_data = json.loads(payload_str)
                 review_id = str(payload_data.get('review_id', ''))
-            except:
+            except (json.JSONDecodeError, KeyError):
                 pass
+            
+            # Если не нашли в payload, берем из id атрибута
+            if not review_id:
+                review_id = block.get('id', '')
             
             # URL отзыва
             review_url = f"{model.url}{review_id}/"
@@ -580,20 +910,57 @@ class MasterDromParser:
                 'photos_count': 0
             }
             
-            # Заголовок
-            title_elem = block.find("a", {"data-ftid": "component_review_title"})
+            # Заголовок - ищем h3 или специальные селекторы
+            title = ""
+            title_elem = block.find("h3")
+            if not title_elem:
+                title_elem = block.find("a", {"data-ftid": "component_review_title"})
             if title_elem:
-                review_data["title"] = title_elem.get_text(strip=True)
+                title = title_elem.get_text(strip=True)
+            review_data["title"] = title
             
-            # Основной контент из div с классом hxiweg0
-            content_elem = block.find("div", class_="hxiweg0")
-            if content_elem:
-                review_data["content"] = content_elem.get_text(strip=True)
+            # Основной контент - собираем из разных секций используя рабочую логику
+            content_parts = []
             
-            # Автор и локация из span внутри _807e4r0
+            # Плюсы
+            positive_elem = block.find("div", {"data-ftid": "review-content__positive"})
+            if positive_elem:
+                positive_text = positive_elem.get_text(strip=True)
+                if positive_text:
+                    content_parts.append(f"Плюсы: {positive_text}")
+            
+            # Минусы
+            negative_elem = block.find("div", {"data-ftid": "review-content__negative"})
+            if negative_elem:
+                negative_text = negative_elem.get_text(strip=True)
+                if negative_text:
+                    content_parts.append(f"Минусы: {negative_text}")
+            
+            # Поломки
+            breakages_elem = block.find("div", {"data-ftid": "review-content__breakages"})
+            if breakages_elem:
+                breakages_text = breakages_elem.get_text(strip=True)
+                if breakages_text:
+                    content_parts.append(f"Поломки: {breakages_text}")
+            
+            # Другие секции с контентом
+            content_sections = block.find_all("div", class_="css-6hj46s")
+            for section in content_sections:
+                text = section.get_text(strip=True)
+                if text and text not in [part.split(': ', 1)[-1] for part in content_parts]:
+                    content_parts.append(text)
+            
+            # Если не нашли контент в специальных секциях, попробуем общие классы
+            if not content_parts:
+                general_content = block.find("div", class_="hxiweg0")
+                if general_content:
+                    content_parts.append(general_content.get_text(strip=True))
+            
+            review_data["content"] = "\n".join(content_parts).strip()
+            
+            # Автор и локация
             description_div = block.find("div", {"data-ftid": "component_review_descrption"})
             if description_div:
-                # Автор и город в span._1ngifes0
                 author_span = description_div.find("span", class_="_1ngifes0")
                 if author_span:
                     spans = author_span.find_all("span")
@@ -607,50 +974,27 @@ class MasterDromParser:
                             review_data["city"] = parts[1].strip()
             
             # Рейтинг
+            rating = 0
             rating_elem = block.find("div", {"data-ftid": "component_rating"})
             if rating_elem:
                 rating_text = rating_elem.get_text(strip=True)
-                rating_match = re.search(r'(\\d+(?:\\.\\d+)?)', rating_text)
+                rating_match = re.search(r'(\d+(?:\.\d+)?)', rating_text)
                 if rating_match:
                     try:
-                        review_data["rating"] = float(rating_match.group(1))
+                        rating = float(rating_match.group(1))
                     except ValueError:
                         pass
+            review_data["rating"] = rating
             
-            # Фотографии
-            img_elem = block.find("img", {"data-ftid": "component_review_image"})
-            photo_urls = []
-            if img_elem:
-                src = img_elem.get('src') or img_elem.get('data-src')
-                if src:
-                    photo_urls.append(src)
-            review_data["photos"] = photo_urls
-            review_data["photos_count"] = len(photo_urls)
-            
-            # Создаем ReviewData
-            return ReviewData(**review_data)
-            
-        except Exception as e:
-            logger.error(f"❌ Ошибка при парсинге длинного отзыва: {e}")
-            return None
-            content_parts = []
-            content_sections = block.find_all("div", class_="css-6hj46s")
-            for section in content_sections:
-                text = section.get_text(strip=True)
-                if text:
-                    content_parts.append(text)
-            
-            if content_parts:
-                review_data["content"] = "\\n".join(content_parts)
-            
-            # Фотографии
+            # Подсчитываем фотографии используя рабочую логику
             photos = block.find_all("img")
             photo_urls = []
             for img in photos:
                 src = img.get('src') or img.get('data-src')
-                if src and 'photo' in src:
+                if src and ('photo' in src or 'auto.drom.ru' in src):
                     photo_urls.append(src)
             review_data["photos"] = photo_urls
+            review_data["photos_count"] = len(photo_urls)
             
             # Создаем ReviewData
             return ReviewData(**review_data)

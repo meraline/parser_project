@@ -48,8 +48,23 @@ def test_long_reviews():
         print(f"Город: {getattr(review, 'city', 'Неизвестно')}")
         print(f"Заголовок: {getattr(review, 'title', 'Нет заголовка')}")
         print(f"Рейтинг: {getattr(review, 'rating', 'Нет рейтинга')}")
-        print(f"Плюсы: {getattr(review, 'positive_text', 'Нет')[:100]}...")
-        print(f"Минусы: {getattr(review, 'negative_text', 'Нет')[:100]}...")
+        content = getattr(review, 'content', 'Нет')
+        if content:
+            print(f"Контент: {content[:100]}...")
+        else:
+            print(f"Контент: Нет")
+        
+        positive_text = getattr(review, 'positive_text', None)
+        if positive_text:
+            print(f"Плюсы: {positive_text[:100]}...")
+        else:
+            print(f"Плюсы: Нет")
+        
+        negative_text = getattr(review, 'negative_text', None)
+        if negative_text:
+            print(f"Минусы: {negative_text[:100]}...")
+        else:
+            print(f"Минусы: Нет")
 
 if __name__ == "__main__":
     test_long_reviews()
