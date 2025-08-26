@@ -36,6 +36,9 @@ class DromReviewsParser:
         # Настройка логирования
         self.logger = logging.getLogger(__name__)
 
+        # Отключаем прокси для избежания SOCKS ошибок
+        self.session.proxies = {}
+        
         # Headers для имитации браузера
         self.session.headers.update(
             {
