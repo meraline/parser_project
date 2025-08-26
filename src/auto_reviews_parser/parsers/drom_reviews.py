@@ -31,34 +31,38 @@ class DromReviewsParser:
         self.base_url = "https://www.drom.ru"
         self.delay = delay
         self.session = requests.Session()
-        self.db_manager = DatabaseManager()
-
+        
         # Настройка логирования
         self.logger = logging.getLogger(__name__)
 
         # Отключаем прокси для избежания SOCKS ошибок
         self.session.proxies = {}
         
-        # Headers для имитации браузера
-        self.session.headers.update(
-            {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/91.0.4472.124 Safari/537.36",
-                "Accept": "text/html,application/xhtml+xml,application/xml;"
-                "q=0.9,*/*;q=0.8",
-                "Accept-Language": "ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3",
-                "Accept-Encoding": "gzip, deflate",
-                "Connection": "keep-alive",
-                "Upgrade-Insecure-Requests": "1",
-            }
-        )
+        # Headers для имитации браузера (устанавливаем напрямую)
+        self.headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/91.0.4472.124 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;"
+            "q=0.9,*/*;q=0.8",
+            "Accept-Language": "ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3",
+            "Accept-Encoding": "gzip, deflate",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+        }
+        
+        # Инициализируем базу данных только если нужно
+        try:
+            self.db_manager = DatabaseManager()
+        except Exception as e:
+            self.logger.warning(f"Не удалось инициализировать DatabaseManager: {e}")
+            self.db_manager = None
 
     def _make_request(self, url: str) -> Optional[BeautifulSoup]:
         """Выполнение HTTP запроса с обработкой ошибок"""
         try:
             self.logger.info(f"Запрос к {url}")
-            response = self.session.get(url, timeout=30)
+            response = self.session.get(url, headers=self.headers, timeout=30)
             response.raise_for_status()
 
             soup = BeautifulSoup(response.content, "html.parser")
