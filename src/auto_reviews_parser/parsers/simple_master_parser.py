@@ -486,7 +486,7 @@ class MasterDromParser:
                 break
                 
             # Поиск блоков длинных отзывов
-            review_blocks = soup.find_all("div", {"data-ftid": "review-item"})
+            review_blocks = soup.find_all("div", {"data-ftid": "component_review"})
             
             if not review_blocks:
                 logger.info(f"📄 Нет длинных отзывов на странице {page}")
@@ -556,8 +556,15 @@ class MasterDromParser:
     def _parse_long_review_block(self, block, model: ModelInfo) -> Optional[ReviewData]:
         """Парсинг блока длинного отзыва"""
         try:
-            # Получаем ID отзыва
-            review_id = block.get('id', '')
+            # Получаем ID отзыва из data-ga-stats-va-payload
+            payload_str = block.get('data-ga-stats-va-payload', '{}')
+            review_id = ''
+            try:
+                import json
+                payload_data = json.loads(payload_str)
+                review_id = str(payload_data.get('review_id', ''))
+            except:
+                pass
             
             # URL отзыва
             review_url = f"{model.url}{review_id}/"
@@ -568,26 +575,39 @@ class MasterDromParser:
                 'brand': model.brand.lower(),
                 'model': model.url_name,
                 'review_type': 'long',
-                'url': review_url
+                'url': review_url,
+                'photos': [],
+                'photos_count': 0
             }
             
-            # Информация об авторе
-            author_elem = block.find("a", class_="css-1u4ddp")
-            if author_elem:
-                review_data["author"] = author_elem.get_text(strip=True)
+            # Заголовок
+            title_elem = block.find("a", {"data-ftid": "component_review_title"})
+            if title_elem:
+                review_data["title"] = title_elem.get_text(strip=True)
             
-            # Дата
-            date_elem = block.find("span", class_="css-1tc5ro3") or block.find("time")
-            if date_elem:
-                review_data["date"] = date_elem.get_text(strip=True)
+            # Основной контент из div с классом hxiweg0
+            content_elem = block.find("div", class_="hxiweg0")
+            if content_elem:
+                review_data["content"] = content_elem.get_text(strip=True)
             
-            # Город
-            city_elem = block.find("span", {"data-ftid": "review-location"})
-            if city_elem:
-                review_data["city"] = city_elem.get_text(strip=True)
+            # Автор и локация из span внутри _807e4r0
+            description_div = block.find("div", {"data-ftid": "component_review_descrption"})
+            if description_div:
+                # Автор и город в span._1ngifes0
+                author_span = description_div.find("span", class_="_1ngifes0")
+                if author_span:
+                    spans = author_span.find_all("span")
+                    if spans:
+                        review_data["author"] = spans[0].get_text(strip=True)
+                    # Город обычно после запятой
+                    full_text = author_span.get_text(strip=True)
+                    if "," in full_text:
+                        parts = full_text.split(",")
+                        if len(parts) > 1:
+                            review_data["city"] = parts[1].strip()
             
             # Рейтинг
-            rating_elem = block.find("div", class_="css-1vkpuwn") or block.find("span", {"data-ftid": "review-rating"})
+            rating_elem = block.find("div", {"data-ftid": "component_rating"})
             if rating_elem:
                 rating_text = rating_elem.get_text(strip=True)
                 rating_match = re.search(r'(\\d+(?:\\.\\d+)?)', rating_text)
@@ -597,27 +617,22 @@ class MasterDromParser:
                     except ValueError:
                         pass
             
-            # Заголовок
-            title_elem = block.find("h3") or block.find("div", {"data-ftid": "review-title"})
-            if title_elem:
-                review_data["title"] = title_elem.get_text(strip=True)
+            # Фотографии
+            img_elem = block.find("img", {"data-ftid": "component_review_image"})
+            photo_urls = []
+            if img_elem:
+                src = img_elem.get('src') or img_elem.get('data-src')
+                if src:
+                    photo_urls.append(src)
+            review_data["photos"] = photo_urls
+            review_data["photos_count"] = len(photo_urls)
             
-            # Плюсы
-            positive_elem = block.find("div", {"data-ftid": "review-content__positive"})
-            if positive_elem:
-                review_data["positive_text"] = positive_elem.get_text(strip=True)
+            # Создаем ReviewData
+            return ReviewData(**review_data)
             
-            # Минусы
-            negative_elem = block.find("div", {"data-ftid": "review-content__negative"})
-            if negative_elem:
-                review_data["negative_text"] = negative_elem.get_text(strip=True)
-                
-            # Поломки
-            breakages_elem = block.find("div", {"data-ftid": "review-content__breakages"})
-            if breakages_elem:
-                review_data["breakages_text"] = breakages_elem.get_text(strip=True)
-            
-            # Основной контент
+        except Exception as e:
+            logger.error(f"❌ Ошибка при парсинге длинного отзыва: {e}")
+            return None
             content_parts = []
             content_sections = block.find_all("div", class_="css-6hj46s")
             for section in content_sections:
