@@ -341,7 +341,7 @@ def main():
     logger.info("🚀 Начинаем миграцию данных из SQLite в PostgreSQL")
     
     # Проверяем наличие SQLite базы
-    sqlite_path = "auto_reviews.db"
+    sqlite_path = "нормализованная_бд_v3.db"
     if not os.path.exists(sqlite_path):
         logger.error(f"❌ SQLite база данных не найдена: {sqlite_path}")
         return False

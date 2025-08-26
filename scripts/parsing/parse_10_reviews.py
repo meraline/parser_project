@@ -12,7 +12,7 @@ project_root = "/home/analityk/Документы/projects/parser_project"
 sys.path.insert(0, project_root)
 sys.path.insert(0, os.path.join(project_root, "src"))
 
-from src.auto_reviews_parser.parsers.drom import DromParser
+from src.auto_reviews_parser.parsers.drom_reviews import DromReviewsParser
 from src.auto_reviews_parser.database.repositories.review_repository import (
     ReviewRepository,
 )
@@ -26,16 +26,16 @@ def parse_first_10_reviews():
     print("=" * 60)
 
     # Инициализируем парсер в щадящем режиме
-    parser = DromParser(gentle_mode=True)
+    parser = DromReviewsParser()
 
     # Инициализируем базу данных и репозиторий
     db = Database("auto_reviews.db")
     repository = ReviewRepository(db)
 
     try:
-        # Парсим отзывы (max_reviews=10 для ограничения)
-        print("📡 Начинаем парсинг отзывов...")
-        reviews = parser.parse_catalog_model("toyota", "camry", max_reviews=10)
+        # Парсим отзывы (max_pages=1 для ограничения)
+        print("📡 Начинаем парсинг коротких отзывов...")
+        reviews = parser.parse_short_reviews("toyota", "camry", max_pages=1)
 
         if not reviews:
             print("❌ Отзывы не найдены")

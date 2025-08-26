@@ -6,12 +6,12 @@ import argparse
 import sys
 from typing import List, Optional
 
-from auto_reviews_parser.database.base import Database
-from auto_reviews_parser.database.repositories.review_repository import ReviewRepository
-from auto_reviews_parser.parsers.drom import DromParser
-from auto_reviews_parser.parsers.drive2 import Drive2Parser
-from auto_reviews_parser.services.parser_service import ParserService
-from auto_reviews_parser.services.parallel_parser import ParallelParserService
+from src.auto_reviews_parser.database.base import Database
+from src.auto_reviews_parser.database.repositories.review_repository import ReviewRepository
+from src.auto_reviews_parser.parsers.drom_reviews import DromParser
+from src.auto_reviews_parser.parsers.drive2 import Drive2Parser
+from src.auto_reviews_parser.services.queue_service import ParserService
+from src.auto_reviews_parser.services.queue_service import ParallelParserService
 
 
 def get_db_path() -> str:
@@ -64,7 +64,7 @@ def run(argv: Optional[List[str]] = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "init":
-        from cli.init_db import init_database
+        from init_db import init_database
 
         return init_database(get_db_path())
 
