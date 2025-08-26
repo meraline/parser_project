@@ -261,146 +261,160 @@ class MasterDromParser:
         return None
 
     def get_brands_catalog(self) -> List[BrandInfo]:
-        """Получение каталога всех брендов"""
-        logger.info("📋 Получение каталога брендов")
-        
-        url = f"{self.base_url}/reviews/"
-        soup = self._make_request(url)
-        
-        if not soup:
-            logger.error("❌ Не удалось получить каталог брендов")
-            return []
+        """
+        Получает каталог всех брендов из блока на главной странице отзывов
+        (Используется проверенная логика из production_drom_parser.py)
+        """
+        try:
+            logger.info("📋 Получение каталога брендов")
             
-        brands = []
-        
-        # Ищем блок с брендами
-        cars_list = soup.find("div", {"data-ftid": "component_cars-list"})
-        if not cars_list or not hasattr(cars_list, 'find_all'):
-            logger.error("❌ Не найден блок с брендами")
+            # Парсим главную страницу отзывов
+            url = f"{self.base_url}/reviews/"
+            response = self.session.get(url, headers=self.headers)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            # Ищем блок с брендами
+            brands_block = soup.find('div', {'data-ftid': 'component_cars-list'})
+            if not brands_block or not hasattr(brands_block, 'find_all'):
+                raise ValueError("Не найден блок с брендами")
+            
+            brands = []
+            
+            # Парсим каждый бренд
+            brand_items = brands_block.find_all('div', class_='frg44i0')
+            
+            for item in brand_items:
+                try:
+                    # Получаем ссылку
+                    link = item.find('a', {'data-ftid': 'component_cars-list-item_hidden-link'})
+                    if not link:
+                        continue
+                    
+                    brand_url = link.get('href')
+                    if not brand_url:
+                        continue
+                    
+                    # Извлекаем имя бренда из URL
+                    url_name = brand_url.rstrip('/').split('/')[-1]
+                    
+                    # Получаем отображаемое имя
+                    name_span = item.find('span', {'data-ftid': 'component_cars-list-item_name'})
+                    if not name_span:
+                        continue
+                    
+                    brand_name = name_span.get_text(strip=True)
+                    
+                    # Получаем количество отзывов
+                    counter_span = item.find('span', {'data-ftid': 'component_cars-list-item_counter'})
+                    reviews_count = 0
+                    if counter_span:
+                        counter_text = counter_span.get_text(strip=True)
+                        # Извлекаем число из текста
+                        count_match = re.search(r'\d+', counter_text.replace(' ', ''))
+                        if count_match:
+                            reviews_count = int(count_match.group())
+                    
+                    # Полный URL если нужно
+                    if not brand_url.startswith('http'):
+                        brand_url = f"{self.base_url}{brand_url}"
+                    
+                    brand_info = BrandInfo(
+                        name=brand_name,
+                        url=brand_url,
+                        reviews_count=reviews_count,
+                        url_name=url_name
+                    )
+                    brands.append(brand_info)
+                    
+                    logger.debug(f"Найден бренд: {brand_name} ({reviews_count} отзывов)")
+                    
+                except Exception as e:
+                    logger.error(f"Ошибка при парсинге бренда: {e}")
+                    continue
+            
+            time.sleep(self.delay)  # Задержка после запроса
+            logger.info(f"✅ Найдено {len(brands)} брендов")
             return brands
             
-        # Парсим бренды
-        brand_items = cars_list.find_all("div", class_="frg44i0")
-        
-        for item in brand_items:
-            try:
-                # Ссылка на бренд
-                link = item.find("a", {"data-ftid": "component_cars-list-item_hidden-link"})
-                if not link:
-                    continue
-                    
-                brand_url = link.get("href")
-                if not brand_url:
-                    continue
-                    
-                # Имя бренда
-                name_span = item.find("span", {"data-ftid": "component_cars-list-item_name"})
-                if not name_span:
-                    continue
-                    
-                brand_name = name_span.get_text(strip=True)
-                
-                # Количество отзывов
-                counter_span = item.find("span", {"data-ftid": "component_cars-list-item_counter"})
-                reviews_count = 0
-                if counter_span:
-                    counter_text = counter_span.get_text(strip=True)
-                    # Извлекаем число из текста
-                    numbers = re.findall(r'\\d+', counter_text.replace(' ', ''))
-                    if numbers:
-                        reviews_count = int(numbers[0])
-                
-                # Извлекаем url_name из ссылки
-                url_name = brand_url.strip('/').split('/')[-1]
-                
-                brand = BrandInfo(
-                    name=brand_name,
-                    url=brand_url,
-                    reviews_count=reviews_count,
-                    url_name=url_name
-                )
-                
-                brands.append(brand)
-                logger.debug(f"✅ Бренд: {brand_name} ({reviews_count} отзывов)")
-                
-            except Exception as e:
-                logger.warning(f"⚠️  Ошибка при парсинге бренда: {e}")
-                continue
-        
-        logger.info(f"✅ Найдено {len(brands)} брендов")
-        return brands
+        except Exception as e:
+            logger.error(f"Ошибка получения каталога брендов: {e}")
+            return []
 
     def get_models_for_brand(self, brand: BrandInfo) -> List[ModelInfo]:
-        """Получение моделей для бренда"""
-        logger.info(f"🏭 Получение моделей для бренда {brand.name}")
-        
-        if not brand.url.startswith('http'):
-            url = urljoin(self.base_url, brand.url)
-        else:
-            url = brand.url
+        """
+        Получает список моделей для бренда
+        (Используется проверенная логика из production_drom_parser.py)
+        """
+        try:
+            logger.info(f"🏭 Получение моделей для бренда {brand.name}")
             
-        soup = self._make_request(url)
-        if not soup:
-            logger.warning(f"⚠️  Не удалось получить страницу бренда {brand.name}")
-            return []
-        
-        models = []
-        
-        # Ищем все ссылки на модели в тексте
-        all_links = soup.find_all("a", href=True)
-        
-        for link in all_links:
-            try:
-                model_url = link.get("href")
-                if not model_url:
+            # Парсим страницу бренда
+            time.sleep(self.delay)
+            response = self.session.get(brand.url, headers=self.headers)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            models = []
+            
+            # Ищем блок с моделями - ссылки на модели имеют конкретный паттерн
+            model_items = soup.find_all('a', href=re.compile(rf'/reviews/{brand.url_name}/[^/]+/?$'))
+            
+            for item in model_items:
+                try:
+                    model_url = item.get('href')
+                    if not model_url:
+                        continue
+                    
+                    # Извлекаем имя модели из URL
+                    url_parts = model_url.rstrip('/').split('/')
+                    if len(url_parts) < 4:
+                        continue
+                    
+                    model_url_name = url_parts[-1]
+                    
+                    # Получаем отображаемое имя модели
+                    model_name = item.get_text(strip=True)
+                    if not model_name:
+                        continue
+                    
+                    # Получаем полный URL
+                    if not model_url.startswith('http'):
+                        full_model_url = f"{self.base_url}{model_url}"
+                    else:
+                        full_model_url = model_url
+                    
+                    # Проверяем что эта модель еще не добавлена
+                    if any(m.url_name == model_url_name for m in models):
+                        continue
+                    
+                    # Получаем количество отзывов для модели
+                    long_count, short_count = self.get_review_counts_for_model_url(full_model_url)
+                    
+                    model_info = ModelInfo(
+                        name=model_name,
+                        brand=brand.name,
+                        url=full_model_url,
+                        long_reviews_count=long_count,
+                        short_reviews_count=short_count,
+                        url_name=model_url_name
+                    )
+                    models.append(model_info)
+                    
+                    logger.debug(f"🚗 Модель: {model_name} (длинных: {long_count}, коротких: {short_count})")
+                    
+                except Exception as e:
+                    logger.error(f"Ошибка при парсинге модели: {e}")
                     continue
-                
-                # Проверяем что это ссылка на модель этого бренда
-                # Пример: /reviews/audi/a3/
-                if f"/reviews/{brand.url_name}/" in model_url:
-                    url_parts = model_url.strip('/').split('/')
-                    # Должно быть: ['reviews', 'brand', 'model']
-                    if len(url_parts) >= 3 and url_parts[0] == 'reviews' and url_parts[1] == brand.url_name:
-                        model_url_name = url_parts[2]
-                        
-                        # Пропускаем если это не модель (например, страница бренда)
-                        if model_url_name == brand.url_name:
-                            continue
-                        
-                        # Название модели из текста ссылки
-                        model_name = link.get_text(strip=True)
-                        
-                        # Очищаем название от номеров в начале строки
-                        import re
-                        if model_name:
-                            model_name = re.sub(r'^\d+', '', model_name).strip()
-                        
-                        if not model_name:
-                            model_name = model_url_name.replace('_', ' ').title()
-                        
-                        # Проверяем что эта модель еще не добавлена
-                        if not any(m.url_name == model_url_name for m in models):
-                            # Получаем количество отзывов для модели
-                            long_count, short_count = self.get_review_counts_for_model_url(model_url)
-                            
-                            model = ModelInfo(
-                                name=model_name,
-                                brand=brand.name,
-                                url=model_url,
-                                long_reviews_count=long_count,
-                                short_reviews_count=short_count,
-                                url_name=model_url_name
-                            )
-                            
-                            models.append(model)
-                            logger.debug(f"🚗 Модель: {model_name} (длинных: {long_count}, коротких: {short_count})")
-                
-            except Exception as e:
-                logger.warning(f"⚠️  Ошибка при парсинге модели: {e}")
-                continue
-        
-        logger.info(f"✅ Найдено {len(models)} моделей для {brand.name}")
-        return models
+            
+            logger.info(f"✅ Найдено {len(models)} моделей для {brand.name}")
+            return models
+            
+        except Exception as e:
+            logger.error(f"Ошибка получения моделей для {brand.name}: {e}")
+            return []
 
     def get_review_counts_for_model_url(self, model_url: str) -> Tuple[int, int]:
         """Получение количества отзывов для модели по URL"""
@@ -416,23 +430,33 @@ class MasterDromParser:
         long_reviews_count = 0
         short_reviews_count = 0
         
-        # Ищем табы с количеством отзывов
-        tabs = soup.find_all("a", {"data-ftid": re.compile(r"reviews_tab_button")})
-        
-        for tab in tabs:
-            tab_text = tab.get_text(strip=True)
+        try:
+            # Используем проверенную логику из production_drom_parser.py
+            # Ищем кнопки переключения между длинными и короткими отзывами
+            tabs_block = soup.find('div', class_='_65ykvx0')
+            if tabs_block and hasattr(tabs_block, 'find'):
+                # Кнопка длинных отзывов
+                long_reviews_tab = tabs_block.find('a', {'data-ftid': 'reviews_tab_button_long_reviews'})
+                if long_reviews_tab and hasattr(long_reviews_tab, 'get_text'):
+                    text = long_reviews_tab.get_text(strip=True)
+                    # Удаляем пробелы из числа для корректного извлечения
+                    match = re.search(r'(\d+)', text.replace(' ', ''))
+                    if match:
+                        long_reviews_count = int(match.group(1))
+                
+                # Кнопка коротких отзывов
+                short_reviews_tab = tabs_block.find('a', {'data-ftid': 'reviews_tab_button_short_reviews'})
+                if short_reviews_tab and hasattr(short_reviews_tab, 'get_text'):
+                    text = short_reviews_tab.get_text(strip=True)
+                    # Удаляем пробелы из числа для корректного извлечения
+                    match = re.search(r'(\d+)', text.replace(' ', ''))
+                    if match:
+                        short_reviews_count = int(match.group(1))
             
-            # Длинные отзывы
-            if "data-ftid" in tab.attrs and "long_reviews" in tab["data-ftid"]:
-                numbers = re.findall(r'\\d+', tab_text.replace(' ', ''))
-                if numbers:
-                    long_reviews_count = int(numbers[0])
-                    
-            # Короткие отзывы
-            elif "data-ftid" in tab.attrs and "short_reviews" in tab["data-ftid"]:
-                numbers = re.findall(r'\\d+', tab_text.replace(' ', ''))
-                if numbers:
-                    short_reviews_count = int(numbers[0])
+            logger.debug(f"📊 {full_url}: {long_reviews_count} длинных, {short_reviews_count} коротких")
+            
+        except Exception as e:
+            logger.warning(f"⚠️  Ошибка при подсчете отзывов для {full_url}: {e}")
         
         return long_reviews_count, short_reviews_count
 
@@ -825,15 +849,15 @@ class MasterDromParser:
                         logger.warning(f"⚠️  Нет моделей для бренда {brand.name}")
                         continue
                     
-                    # Берем первую модель с отзывами
+                    # Берем первую модель с отзывами - НЕ проверяем все подряд для демо
                     target_model = None
-                    for model in models:
+                    for model in models[:5]:  # Проверяем только первые 5 моделей
                         if model.long_reviews_count > 0 or model.short_reviews_count > 0:
                             target_model = model
                             break
                     
                     if not target_model:
-                        logger.warning(f"⚠️  Нет моделей с отзывами для бренда {brand.name}")
+                        logger.warning(f"⚠️  Нет моделей с отзывами для бренда {brand.name} (проверены первые 5)")
                         continue
                     
                     # Парсим отзывы
